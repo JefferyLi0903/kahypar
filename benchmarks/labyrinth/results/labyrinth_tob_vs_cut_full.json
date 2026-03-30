@@ -1,0 +1,282 @@
+[
+  {
+    "graph": "ibm01.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 4061,
+    "edges": 9128,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 0.83,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm01.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 19564551327,
+      "cut": 910,
+      "imbalance": 0.029527559055118058
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 1.26,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm01.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 5886485630,
+      "cut": 5364,
+      "imbalance": 0.029527559055118058
+    },
+    "delta_tob_cut_minus_tob": 13678065697,
+    "delta_cut_tob_minus_cut": 4454
+  },
+  {
+    "graph": "ibm02.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 5087,
+    "edges": 14270,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 2.39,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm02.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 28481021232,
+      "cut": 2239,
+      "imbalance": 0.029874213836478036
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 3.2,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm02.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 7056340640,
+      "cut": 8745,
+      "imbalance": 0.029874213836478036
+    },
+    "delta_tob_cut_minus_tob": 21424680592,
+    "delta_cut_tob_minus_cut": 6506
+  },
+  {
+    "graph": "ibm03.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 5085,
+    "edges": 15289,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 2.24,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm03.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 30916372385,
+      "cut": 2349,
+      "imbalance": 0.029874213836478036
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 2.42,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm03.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 9173790306,
+      "cut": 7732,
+      "imbalance": 0.022012578616352307
+    },
+    "delta_tob_cut_minus_tob": 21742582079,
+    "delta_cut_tob_minus_cut": 5383
+  },
+  {
+    "graph": "ibm04.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 6105,
+    "edges": 19738,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 2.52,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm04.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 21601236876,
+      "cut": 2903,
+      "imbalance": 0.028795811518324665
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 2.89,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm04.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 7518122825,
+      "cut": 8325,
+      "imbalance": 0.028795811518324665
+    },
+    "delta_tob_cut_minus_tob": 14083114051,
+    "delta_cut_tob_minus_cut": 5422
+  },
+  {
+    "graph": "ibm05.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 8128,
+    "edges": 21135,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 5.74,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm05.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 21479576900,
+      "cut": 5546,
+      "imbalance": 0.029527559055118058
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 8.99,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm05.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 2384264154,
+      "cut": 15115,
+      "imbalance": 0.029527559055118058
+    },
+    "delta_tob_cut_minus_tob": 19095312746,
+    "delta_cut_tob_minus_cut": 9569
+  },
+  {
+    "graph": "ibm06.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 8121,
+    "edges": 25797,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 4.73,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm06.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 40489800773,
+      "cut": 3072,
+      "imbalance": 0.029527559055118058
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 5.91,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm06.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 20940394324,
+      "cut": 9110,
+      "imbalance": 0.029527559055118058
+    },
+    "delta_tob_cut_minus_tob": 19549406449,
+    "delta_cut_tob_minus_cut": 6038
+  },
+  {
+    "graph": "ibm07.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 12186,
+    "edges": 34378,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 9.02,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm07.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 19744653896,
+      "cut": 4046,
+      "imbalance": 0.028871391076115582
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 12.62,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm07.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 5688810961,
+      "cut": 12270,
+      "imbalance": 0.028871391076115582
+    },
+    "delta_tob_cut_minus_tob": 14055842935,
+    "delta_cut_tob_minus_cut": 8224
+  },
+  {
+    "graph": "ibm08.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 12190,
+    "edges": 35195,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 12.35,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm08.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 21991569898,
+      "cut": 4123,
+      "imbalance": 0.028871391076115582
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 14.65,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm08.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 9066835501,
+      "cut": 10278,
+      "imbalance": 0.029527559055118058
+    },
+    "delta_tob_cut_minus_tob": 12924734397,
+    "delta_cut_tob_minus_cut": 6155
+  },
+  {
+    "graph": "ibm09.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 16232,
+    "edges": 39592,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 13.72,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm09.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 18330067145,
+      "cut": 3202,
+      "imbalance": 0.028092656481025102
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 20.04,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm09.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 2665687905,
+      "cut": 20891,
+      "imbalance": 0.029571217348447476
+    },
+    "delta_tob_cut_minus_tob": 15664379240,
+    "delta_cut_tob_minus_cut": 17689
+  },
+  {
+    "graph": "ibm10.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 16244,
+    "edges": 49491,
+    "cut": {
+      "status": "ok",
+      "runtime_sec": 15.5,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm10.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 22024284857,
+      "cut": 4158,
+      "imbalance": 0.029049729197439644
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 21.37,
+      "error": "",
+      "part_file": "/home/jefferyli/Project/kahypar/benchmarks/labyrinth/dah/ibm10.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 6948368718,
+      "cut": 18850,
+      "imbalance": 0.02954209748892178
+    },
+    "delta_tob_cut_minus_tob": 15075916139,
+    "delta_cut_tob_minus_cut": 14692
+  }
+]
