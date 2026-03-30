@@ -29,3 +29,56 @@ python3 scripts/convert_labyrinth_benchmarks_to_dah.py \
 
 Benchmark run summaries are written to:
 - `benchmarks/labyrinth/results/labyrinth_tob_results.json`
+
+## Full ablation script
+
+To run `cut` vs `tob` ablation over `ibm01-10` on your own host, use:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py
+```
+
+What this script does:
+- optionally configures and builds KaHyPar with CMake
+- runs the Labyrinth `ibm01-10` `.dah` cases serially
+- for each case, runs both `-o cut` and `-o tob`
+- copies each successful partition into objective-specific files
+- recomputes `TOB / cut / imbalance` with a unified offline evaluator
+- writes aggregated JSON results
+
+Default output:
+- `benchmarks/labyrinth/results/labyrinth_tob_vs_cut_full.json`
+
+### Recommended usage on a fresh host
+
+If the raw benchmarks have already been downloaded and converted:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py
+```
+
+If you want to skip the CMake build and use an existing binary:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py --skip-build
+```
+
+If you only want a subset of cases:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py --cases ibm01 ibm02 ibm03
+```
+
+### Important behavior
+
+- The script removes the default KaHyPar partition output before each run, so it does not silently reuse stale partition files.
+- Metrics are only recorded for successful runs.
+- `cut` runs on larger Labyrinth cases can be much slower than `tob`, so the script uses:
+  - KaHyPar internal `--time-limit 180`
+  - external per-run timeout `420s`
+
+You can override those defaults, for example:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py --time-limit 300 --timeout 900
+```
