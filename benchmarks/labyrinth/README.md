@@ -69,6 +69,12 @@ If you only want a subset of cases:
 python3 scripts/run_labyrinth_ablation.py --cases ibm01 ibm02 ibm03
 ```
 
+If you want to remove both the KaHyPar internal time limit and the outer Python timeout:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py --no-time-limits
+```
+
 ### Important behavior
 
 - The script removes the default KaHyPar partition output before each run, so it does not silently reuse stale partition files.
@@ -81,4 +87,10 @@ You can override those defaults, for example:
 
 ```bash
 python3 scripts/run_labyrinth_ablation.py --time-limit 300 --timeout 900
+```
+
+Or disable both limits entirely:
+
+```bash
+python3 scripts/run_labyrinth_ablation.py --no-time-limits
 ```

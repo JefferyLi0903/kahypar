@@ -64,6 +64,14 @@ def parse_args() -> argparse.Namespace:
         help="External per-run timeout in seconds",
     )
     parser.add_argument(
+        "--no-time-limits",
+        action="store_true",
+        help=(
+            "Disable both KaHyPar internal --time-limit and the outer Python timeout. "
+            "Runs may take a very long time on larger cases."
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=root / "benchmarks/labyrinth/results/labyrinth_tob_vs_cut_full.json",
@@ -222,8 +230,6 @@ def run_one_objective(
         str(args.config),
         "--seed",
         str(args.seed),
-        "--time-limit",
-        str(args.time_limit),
         "--i-runs",
         "1",
         "--r-runs",
@@ -238,6 +244,8 @@ def run_one_objective(
         "-q",
         "true",
     ]
+    if not args.no_time_limits:
+        cmd.extend(["--time-limit", str(args.time_limit)])
 
     start = time.time()
     status = "ok"
@@ -248,7 +256,7 @@ def run_one_objective(
             cwd=str(repo_root()),
             capture_output=True,
             text=True,
-            timeout=args.timeout,
+            timeout=None if args.no_time_limits else args.timeout,
         )
         if proc.returncode != 0:
             status = f"failed_rc_{proc.returncode}"
