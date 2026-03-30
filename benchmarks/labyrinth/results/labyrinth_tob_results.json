@@ -1,0 +1,92 @@
+[
+  {
+    "graph": "ibm01.dah",
+    "status": "ok",
+    "runtime_sec": 69.86,
+    "nodes": 4061,
+    "edges": 9128,
+    "tob_scaled": 5118507002,
+    "cut": 5439,
+    "imbalance": 0.029527559055118058,
+    "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm01.dah.part8.epsilon0.03.seed1.KaHyPar"
+  },
+  {
+    "graph": "ibm02.dah",
+    "status": "ok",
+    "runtime_sec": 101.64,
+    "nodes": 5087,
+    "edges": 14270,
+    "tob_scaled": 5449768079,
+    "cut": 8684,
+    "imbalance": 0.029874213836478036,
+    "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm02.dah.part8.epsilon0.03.seed1.KaHyPar"
+  },
+  {
+    "graph": "ibm03.dah",
+    "status": "ok",
+    "runtime_sec": 88.89,
+    "nodes": 5085,
+    "edges": 15289,
+    "tob_scaled": 10615522092,
+    "cut": 9588,
+    "imbalance": 0.029874213836478036,
+    "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm03.dah.part8.epsilon0.03.seed1.KaHyPar"
+  },
+  {
+    "graph": "ibm04.dah",
+    "status": "ok",
+    "runtime_sec": 100.18,
+    "nodes": 6105,
+    "edges": 19738,
+    "tob_scaled": 6681242825,
+    "cut": 8160,
+    "imbalance": 0.027486910994764413,
+    "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm04.dah.part8.epsilon0.03.seed1.KaHyPar"
+  },
+  {
+    "graph": "ibm05.dah",
+    "status": "timeout",
+    "runtime_sec": 300.01,
+    "nodes": 8128,
+    "edges": 21135
+  },
+  {
+    "graph": "ibm06.dah",
+    "status": "ok",
+    "runtime_sec": 254.11,
+    "nodes": 8121,
+    "edges": 25797,
+    "tob_scaled": 22102339297,
+    "cut": 10370,
+    "imbalance": 0.029527559055118058,
+    "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm06.dah.part8.epsilon0.03.seed1.KaHyPar"
+  },
+  {
+    "graph": "ibm07.dah",
+    "status": "timeout",
+    "runtime_sec": 300.01,
+    "nodes": 12186,
+    "edges": 34378
+  },
+  {
+    "graph": "ibm08.dah",
+    "status": "timeout",
+    "runtime_sec": 300.01,
+    "nodes": 12190,
+    "edges": 35195
+  },
+  {
+    "graph": "ibm09.dah",
+    "status": "timeout",
+    "runtime_sec": 300.01,
+    "nodes": 16232,
+    "edges": 39592
+  },
+  {
+    "graph": "ibm10.dah",
+    "status": "timeout",
+    "runtime_sec": 300.01,
+    "nodes": 16244,
+    "edges": 49491
+  }
+]

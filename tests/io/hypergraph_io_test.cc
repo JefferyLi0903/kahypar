@@ -266,5 +266,94 @@ TEST(DuplicatePinsAndInvalidHes, GetRemovedDuringParsing) {
   ASSERT_THAT(hypergraph.initialNumPins(), Eq(6));
 }
 
+// ==================== Topological Level I/O Tests ====================
+
+TEST(TopologicalLevelIO, CanWriteAndReadTopologicalLevels) {
+  // Create a hypergraph with topological levels
+  Hypergraph hypergraph(4, 2, HyperedgeIndexVector { 0, 2, /*sentinel*/ 4 },
+                        HyperedgeVector { 0, 1, 2, 3 }, 2);
+  
+  std::vector<int32_t> levels = {0, 3, 1, 2};
+  hypergraph.setTopologicalLevels(levels);
+  
+  // Write to file
+  std::string filename = "test_instances/test_topological_levels.lvl";
+  writeTopologicalLevelFile(hypergraph, filename);
+  
+  // Create a new hypergraph and read levels
+  Hypergraph hypergraph2(4, 2, HyperedgeIndexVector { 0, 2, /*sentinel*/ 4 },
+                         HyperedgeVector { 0, 1, 2, 3 }, 2);
+  readTopologicalLevelFile(hypergraph2, filename);
+  
+  // Verify levels match
+  ASSERT_TRUE(hypergraph2.hasTopologicalLevels());
+  for (HypernodeID hn = 0; hn < 4; ++hn) {
+    ASSERT_THAT(hypergraph2.topologicalLevel(hn), Eq(levels[hn]));
+  }
+}
+
+TEST(TopologicalLevelIO, ComputesTopologicalLevelsFromHypergraph) {
+  // Create a hypergraph where first pin is source, rest are targets
+  // HE0: 0 -> 1, 2 (node 0 is source, nodes 1, 2 are targets)
+  // HE1: 1 -> 3 (node 1 is source, node 3 is target)
+  Hypergraph hypergraph(4, 2, HyperedgeIndexVector { 0, 3, /*sentinel*/ 5 },
+                        HyperedgeVector { 0, 1, 2, 1, 3 }, 2);
+  
+  computeTopologicalLevelsFromHypergraph(hypergraph, 0);
+  
+  ASSERT_TRUE(hypergraph.hasTopologicalLevels());
+  // Expected levels: 0 -> level 0, 1 -> level 1, 2 -> level 1, 3 -> level 2
+  ASSERT_THAT(hypergraph.topologicalLevel(0), Eq(0));
+  ASSERT_THAT(hypergraph.topologicalLevel(1), Eq(1));
+  ASSERT_THAT(hypergraph.topologicalLevel(2), Eq(1));
+  ASSERT_THAT(hypergraph.topologicalLevel(3), Eq(2));
+}
+
+TEST(TopologicalLevelIO, HypergraphWithoutLevelsWritesZeros) {
+  Hypergraph hypergraph(3, 1, HyperedgeIndexVector { 0, /*sentinel*/ 3 },
+                        HyperedgeVector { 0, 1, 2 }, 2);
+  
+  // No topological levels set
+  ASSERT_FALSE(hypergraph.hasTopologicalLevels());
+  
+  std::string filename = "test_instances/test_no_levels.lvl";
+  writeTopologicalLevelFile(hypergraph, filename);
+  
+  // Read the file and verify it contains zeros
+  std::ifstream file(filename);
+  int32_t level;
+  int count = 0;
+  while (file >> level) {
+    ASSERT_THAT(level, Eq(0));
+    ++count;
+  }
+  ASSERT_THAT(count, Eq(3));
+}
+
+TEST(TopologicalLevelIO, CreatesHypergraphFromDahInputFile) {
+  Hypergraph hypergraph = createHypergraphFromInputFile("test_instances/simple_pipeline.dah", 2);
+
+  ASSERT_TRUE(hypergraph.hasTopologicalLevels());
+  ASSERT_THAT(hypergraph.initialNumNodes(), Eq(4));
+  ASSERT_THAT(hypergraph.initialNumEdges(), Eq(3));
+  ASSERT_THAT(hypergraph.topologicalLevel(0), Eq(0));
+  ASSERT_THAT(hypergraph.topologicalLevel(1), Eq(1));
+  ASSERT_THAT(hypergraph.topologicalLevel(2), Eq(2));
+  ASSERT_THAT(hypergraph.topologicalLevel(3), Eq(3));
+}
+
+TEST(TopologicalLevelIO, CreatesHypergraphFromHgrAndLevelSidecar) {
+  Hypergraph hypergraph = createHypergraphFromInputFile("test_instances/simple_pipeline.hgr", 2,
+                                                        "test_instances/simple_pipeline.lvl");
+
+  ASSERT_TRUE(hypergraph.hasTopologicalLevels());
+  ASSERT_THAT(hypergraph.initialNumNodes(), Eq(4));
+  ASSERT_THAT(hypergraph.initialNumEdges(), Eq(3));
+  ASSERT_THAT(hypergraph.topologicalLevel(0), Eq(0));
+  ASSERT_THAT(hypergraph.topologicalLevel(1), Eq(1));
+  ASSERT_THAT(hypergraph.topologicalLevel(2), Eq(2));
+  ASSERT_THAT(hypergraph.topologicalLevel(3), Eq(3));
+}
+
 }  // namespace io
 }  // namespace kahypar

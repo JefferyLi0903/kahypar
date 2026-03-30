@@ -65,6 +65,7 @@ class VertexPairCoarsenerBase : public CoarsenerBase {
   bool doUncoarsen(IRefiner& refiner) {
     Metrics current_metrics = { metrics::hyperedgeCut(_hg),
                                 metrics::km1(_hg),
+                                metrics::topologyDifference(_hg),
                                 metrics::imbalance(_hg, _context) };
     HyperedgeWeight initial_objective = std::numeric_limits<HyperedgeWeight>::min();
 
@@ -74,6 +75,9 @@ class VertexPairCoarsenerBase : public CoarsenerBase {
         break;
       case Objective::km1:
         initial_objective = current_metrics.km1;
+        break;
+      case Objective::tob:
+        initial_objective = current_metrics.tob;
         break;
       default:
         LOG << "Unknown Objective";
@@ -159,6 +163,10 @@ class VertexPairCoarsenerBase : public CoarsenerBase {
         }
         // _context.stats.set(StatTag::LocalSearch, "finalKm1", current_metrics.km1);
         improvement_found = current_metrics.km1 < initial_objective;
+        break;
+      case Objective::tob:
+        // _context.stats.set(StatTag::LocalSearch, "finalTob", current_metrics.tob);
+        improvement_found = current_metrics.tob < initial_objective;
         break;
       default:
         LOG << "Unknown Objective";

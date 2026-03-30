@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "kahypar/kahypar.h"
+#include "kahypar/io/hypergraph_io.h"
 
 namespace po = boost::program_options;
 
@@ -73,6 +74,24 @@ po::options_description createGeneralOptionsDescription(Context& context, const 
     ("fixed-vertices,f",
     po::value<std::string>(&context.partition.fixed_vertex_filename)->value_name("<string>"),
     "Fixed vertex filename")
+    ("topology-file",
+    po::value<std::string>(&context.partition.topological_levels_filename)->value_name("<string>"),
+    "Topological levels filename used with .hgr inputs when optimizing tob")
+    ("tob-beta",
+    po::value<double>(&context.partition.tob_beta)->value_name("<double>"),
+    "Weighting parameter beta for TOB objective model (default: 0.2)")
+    ("tob-gamma",
+    po::value<double>(&context.partition.tob_gamma)->value_name("<double>"),
+    "Coarsening TOB gain weight gamma (default: 1.0)")
+    ("tob-delta",
+    po::value<double>(&context.partition.tob_delta)->value_name("<double>"),
+    "Initial partitioning TOB gain weight delta (default: 10000.0)")
+    ("tob-zeta",
+    po::value<double>(&context.partition.tob_zeta)->value_name("<double>"),
+    "Refinement TOB gain weight zeta (default: 1.0)")
+    ("tob-io-bram-constraints",
+    po::value<bool>(&context.partition.tob_enable_io_bram_constraints)->value_name("<bool>"),
+    "Enable IO/BRAM contraction hooks for TOB path (default: false)")
     ("part-file",
     po::value<std::string>(&context.partition.input_partition_filename)->value_name("<string>"),
     "Input Partition filename. The input partition is then refined using direct k-way V-cycles.")
@@ -94,11 +113,14 @@ po::options_description createGeneralOptionsDescription(Context& context, const 
         context.partition.objective = Objective::cut;
       } else if (s == "km1") {
         context.partition.objective = Objective::km1;
+      } else if (s == "tob") {
+        context.partition.objective = Objective::tob;
       }
     }),
     "Objective: \n"
     " - cut : cut-net metric \n"
-    " - km1 : (lambda-1) metric")
+    " - km1 : (lambda-1) metric \n"
+    " - tob : topological order balancing (for DAGs)")
     ("mode,m",
     po::value<std::string>()->value_name("<string>")->required()->notifier(
       [&](const std::string& mode) {
@@ -315,6 +337,7 @@ po::options_description createRefinementOptionsDescription(Context& context,
     " - kway_fm_km1                  : k-way FM algorithm         (direct k-way        : km1)\n"
     " - kway_fm_hyperflow_cutter_km1 : k-way FM + HyperFlowCutter (direct k-way        : km1)\n"
     " - kway_hyperflow_cutter        : k-way HyperFlowCutter      (direct k-way        : cut & km1)\n"
+    " - tob_refine                   : TOB-aware 2-phase greedy refiner (direct k-way    : tob)\n"
     )
     ((initial_partitioning ? "i-r-runs" : "r-runs"),
     po::value<int>((initial_partitioning ? &context.initial_partitioning.local_search.iterations_per_level : &context.local_search.iterations_per_level))->value_name("<int>")->notifier(
@@ -382,7 +405,7 @@ po::options_description createInitialPartitioningOptionsDescription(Context& con
       context.initial_partitioning.algo =
         kahypar::initialPartitioningAlgorithmFromString(ip_algo);
     }),
-    "Algorithm used to create initial partition: pool ")
+    "Algorithm used to create initial partition: pool, tob_super_far ")
     ("i-bp-algorithm",
     po::value<std::string>()->value_name("<string>")->notifier(
       [&](const std::string& ip_bp_algo) {
@@ -727,6 +750,21 @@ void processCommandLineInput(Context& context, int argc, char* argv[]) {
   if (context.partition.use_individual_part_weights) {
     context.partition.epsilon = 0;
   }
+}
+
+inline void validateTopologyObjectiveConfiguration(Context& context,
+                                                  const Hypergraph& hypergraph) {
+  if (context.partition.objective != Objective::tob) {
+    return;
+  }
+  context.initial_partitioning.technique = InitialPartitioningTechnique::flat;
+  context.initial_partitioning.mode = Mode::direct_kway;
+  context.local_search.algorithm = RefinementAlgorithm::tob_refine;
+  context.initial_partitioning.local_search.algorithm = RefinementAlgorithm::tob_refine;
+  context.initial_partitioning.algo = InitialPartitionerAlgorithm::tob_super_far;
+  ALWAYS_ASSERT(hypergraph.hasTopologicalLevels(),
+                "Objective 'tob' requires topological levels. "
+                "Use a .dah input or pass --topology-file <levels.lvl> together with a .hgr file.");
 }
 
 template <typename T>

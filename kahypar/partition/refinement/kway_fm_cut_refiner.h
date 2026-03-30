@@ -115,8 +115,13 @@ class KWayFMRefiner final : public IRefiner,
                   const std::array<HypernodeWeight, 2>&,
                   const UncontractionGainChanges&,
                   Metrics& best_metrics) override final {
-    HEAVY_REFINEMENT_ASSERT(best_metrics.cut == metrics::hyperedgeCut(_hg),
-           V(best_metrics.cut) << V(metrics::hyperedgeCut(_hg)));
+    if (_context.partition.objective == Objective::tob) {
+      HEAVY_REFINEMENT_ASSERT(best_metrics.tob == metrics::topologyDifference(_hg),
+             V(best_metrics.tob) << V(metrics::topologyDifference(_hg)));
+    } else {
+      HEAVY_REFINEMENT_ASSERT(best_metrics.cut == metrics::hyperedgeCut(_hg),
+             V(best_metrics.cut) << V(metrics::hyperedgeCut(_hg)));
+    }
     HEAVY_REFINEMENT_ASSERT(FloatingPoint<double>(best_metrics.imbalance).AlmostEquals(
              FloatingPoint<double>(metrics::imbalance(_hg, _context))),
            V(best_metrics.imbalance) << V(metrics::imbalance(_hg, _context)));
@@ -125,18 +130,36 @@ class KWayFMRefiner final : public IRefiner,
     _he_fully_active.reset();
     _locked_hes.resetUsedEntries();
 
+    // Initialize part level info for TOB if needed
+    if (_context.partition.objective == Objective::tob && _hg.hasTopologicalLevels()) {
+      _hg.initializePartLevelInfo();
+    }
 
-    Randomize::instance().shuffleVector(refinement_nodes, refinement_nodes.size());
-    for (const HypernodeID& hn : refinement_nodes) {
-      activate<true>(hn);
+    if (_context.partition.objective == Objective::tob) {
+      for (const HypernodeID& hn : _hg.nodes()) {
+        if (_hg.isBorderNode(hn) && likely(!_hg.isFixedVertex(hn))) {
+          activate<true>(hn);
+        }
+      }
+    } else {
+      Randomize::instance().shuffleVector(refinement_nodes, refinement_nodes.size());
+      for (const HypernodeID& hn : refinement_nodes) {
+        activate<true>(hn);
+      }
     }
 
     Base::activateAdjacentFreeVertices(refinement_nodes);
     ASSERT_THAT_GAIN_CACHE_IS_VALID();
 
     const HyperedgeWeight initial_cut = best_metrics.cut;
+    HyperedgeWeight initial_tob = 0;
+    if (_context.partition.objective == Objective::tob) {
+      initial_tob = metrics::topologyDifference(_hg);
+      best_metrics.tob = initial_tob;
+    }
     const double initial_imbalance = best_metrics.imbalance;
     HyperedgeWeight current_cut = best_metrics.cut;
+    HyperedgeWeight current_tob = initial_tob;
     double current_imbalance = best_metrics.imbalance;
 
     int min_cut_index = -1;
@@ -144,14 +167,26 @@ class KWayFMRefiner final : public IRefiner,
     _stopping_policy.resetStatistics();
 
     const double beta = log(_hg.currentNumNodes());
+    const HyperedgeWeight& current_metric = (_context.partition.objective == Objective::tob) ? 
+                                             current_tob : current_cut;
+    const HyperedgeWeight& best_metric = (_context.partition.objective == Objective::tob) ? 
+                                         best_metrics.tob : best_metrics.cut;
     while (!_pq.empty() &&
            !_stopping_policy.searchShouldStop(touched_hns_since_last_improvement,
-                                              _context, beta, best_metrics.cut, current_cut)) {
+                                              _context, beta, best_metric, current_metric)) {
       Gain max_gain = kInvalidGain;
       HypernodeID max_gain_node = kInvalidHN;
       PartitionID to_part = Hypergraph::kInvalidPartition;
       _pq.deleteMax(max_gain_node, max_gain, to_part);
       PartitionID from_part = _hg.partID(max_gain_node);
+
+      if (_context.partition.objective == Objective::tob) {
+        const Gain exact_gain = gainInducedByHypergraph(max_gain_node, to_part);
+        if (exact_gain != max_gain) {
+          refreshPQEntriesForNode(max_gain_node);
+          continue;
+        }
+      }
 
       DBG << V(current_cut) << V(max_gain_node) << V(max_gain)
           << V(_hg.partID(max_gain_node)) << V(to_part);
@@ -159,13 +194,26 @@ class KWayFMRefiner final : public IRefiner,
       ASSERT(!_hg.marked(max_gain_node), V(max_gain_node));
       HEAVY_REFINEMENT_ASSERT(max_gain == gainInducedByHypergraph(max_gain_node, to_part));
       ASSERT(_hg.isBorderNode(max_gain_node));
-      HEAVY_REFINEMENT_ASSERT([&]() {
-          _hg.changeNodePart(max_gain_node, from_part, to_part);
-          ASSERT((current_cut - max_gain) == metrics::hyperedgeCut(_hg),
-                 "cut=" << current_cut - max_gain << "!=" << metrics::hyperedgeCut(_hg));
-          _hg.changeNodePart(max_gain_node, to_part, from_part);
-          return true;
-        } ());
+      if (_context.partition.objective == Objective::tob) {
+        HEAVY_REFINEMENT_ASSERT([&]() {
+            _hg.changeNodePart(max_gain_node, from_part, to_part);
+            const HyperedgeWeight new_tob = metrics::topologyDifference(_hg);
+            const HyperedgeWeight new_cut = metrics::hyperedgeCut(_hg);
+            _hg.changeNodePart(max_gain_node, to_part, from_part);
+            ASSERT((current_tob - max_gain) == new_tob,
+                   "tob=" << current_tob - max_gain << "!=" << new_tob);
+            ASSERT(new_cut >= 0);
+            return true;
+          } ());
+      } else {
+        HEAVY_REFINEMENT_ASSERT([&]() {
+            _hg.changeNodePart(max_gain_node, from_part, to_part);
+            ASSERT((current_cut - max_gain) == metrics::hyperedgeCut(_hg),
+                   "cut=" << current_cut - max_gain << "!=" << metrics::hyperedgeCut(_hg));
+            _hg.changeNodePart(max_gain_node, to_part, from_part);
+            return true;
+          } ());
+      }
 
       // Staleness assertion: The move should be to a part that is in the connectivity superset of
       // the max_gain_node.
@@ -201,31 +249,56 @@ class KWayFMRefiner final : public IRefiner,
 
         current_imbalance = metrics::imbalance(_hg, _context);
 
-        current_cut -= max_gain;
+        if (_context.partition.objective == Objective::tob) {
+          current_tob -= max_gain;
+          current_cut = metrics::hyperedgeCut(_hg);
+        } else {
+          current_cut -= max_gain;
+        }
         _stopping_policy.updateStatistics(max_gain);
 
-        HEAVY_REFINEMENT_ASSERT(current_cut == metrics::hyperedgeCut(_hg),
-               V(current_cut) << V(metrics::hyperedgeCut(_hg)));
+        if (_context.partition.objective == Objective::tob) {
+          HEAVY_REFINEMENT_ASSERT(current_tob == metrics::topologyDifference(_hg),
+                 V(current_tob) << V(metrics::topologyDifference(_hg)));
+        } else {
+          HEAVY_REFINEMENT_ASSERT(current_cut == metrics::hyperedgeCut(_hg),
+                 V(current_cut) << V(metrics::hyperedgeCut(_hg)));
+        }
         HEAVY_REFINEMENT_ASSERT(current_imbalance == metrics::imbalance(_hg, _context),
                V(current_imbalance) << V(metrics::imbalance(_hg, _context)));
 
         updateNeighbours(max_gain_node, from_part, to_part);
 
-        // right now, we do not allow a decrease in cut in favor of an increase in balance
-        const bool improved_cut_within_balance = (current_imbalance <= _context.partition.epsilon) &&
-                                                 (current_cut < best_metrics.cut);
-        const bool improved_balance_less_equal_cut = (current_imbalance < best_metrics.imbalance) &&
-                                                     (current_cut <= best_metrics.cut);
-        // if (current_cut < best_metrics.cut && current_imbalance > _context.partition.epsilon) {
-        //   LOG << V(current_cut) << V(best_metrics.cut) << V(current_imbalance);
-        // }
+        // Check for improvement
+        bool improved = false;
+        if (_context.partition.objective == Objective::tob) {
+          improved = metrics::isBetterPartition(current_tob, best_metrics.tob,
+                                                current_cut, best_metrics.cut,
+                                                current_imbalance, best_metrics.imbalance,
+                                                _context.partition.epsilon);
+        } else {
+          const bool improved_cut_within_balance = (current_imbalance <= _context.partition.epsilon) &&
+                                                   (current_cut < best_metrics.cut);
+          const bool improved_balance_less_equal_cut = (current_imbalance < best_metrics.imbalance) &&
+                                                       (current_cut <= best_metrics.cut);
+          improved = improved_cut_within_balance || improved_balance_less_equal_cut;
+        }
 
-        if (improved_cut_within_balance || improved_balance_less_equal_cut) {
-          DBGC(max_gain == 0) << "KWayFM improved balance between" << from_part << "and "
-                              << to_part << "(max_gain=" << max_gain << ")";
-          DBGC(current_cut < best_metrics.cut) << "KWayFM improved cut from "
-                                               << best_metrics.cut << "to" << current_cut;
-          best_metrics.cut = current_cut;
+        if (improved) {
+          if (_context.partition.objective == Objective::tob) {
+            DBGC(max_gain == 0) << "KWayFM improved balance between" << from_part << "and "
+                                << to_part << "(max_gain=" << max_gain << ")";
+            DBGC(current_tob < best_metrics.tob) << "KWayFM improved TOB from "
+                                                 << best_metrics.tob << "to" << current_tob;
+            best_metrics.tob = current_tob;
+            best_metrics.cut = current_cut;
+          } else {
+            DBGC(max_gain == 0) << "KWayFM improved balance between" << from_part << "and "
+                                << to_part << "(max_gain=" << max_gain << ")";
+            DBGC(current_cut < best_metrics.cut) << "KWayFM improved cut from "
+                                                 << best_metrics.cut << "to" << current_cut;
+            best_metrics.cut = current_cut;
+          }
           best_metrics.imbalance = current_imbalance;
           _stopping_policy.resetStatistics();
           min_cut_index = _performed_moves.size();
@@ -245,12 +318,20 @@ class KWayFMRefiner final : public IRefiner,
     _gain_cache.rollbackDelta();
 
     ASSERT_THAT_GAIN_CACHE_IS_VALID();
-    HEAVY_REFINEMENT_ASSERT(best_metrics.cut == metrics::hyperedgeCut(_hg));
-    ASSERT(best_metrics.cut <= initial_cut, V(initial_cut) << V(best_metrics.cut));
-
-    return FMImprovementPolicy::improvementFound(best_metrics.cut, initial_cut,
-                                                 best_metrics.imbalance,
-                                                 initial_imbalance, _context.partition.epsilon);
+    if (_context.partition.objective == Objective::tob) {
+      HEAVY_REFINEMENT_ASSERT(best_metrics.tob == metrics::topologyDifference(_hg));
+      HEAVY_REFINEMENT_ASSERT(best_metrics.cut == metrics::hyperedgeCut(_hg));
+      ASSERT(best_metrics.tob <= initial_tob, V(initial_tob) << V(best_metrics.tob));
+      return FMImprovementPolicy::improvementFound(best_metrics.tob, initial_tob,
+                                                   best_metrics.imbalance,
+                                                   initial_imbalance, _context.partition.epsilon);
+    } else {
+      HEAVY_REFINEMENT_ASSERT(best_metrics.cut == metrics::hyperedgeCut(_hg));
+      ASSERT(best_metrics.cut <= initial_cut, V(initial_cut) << V(best_metrics.cut));
+      return FMImprovementPolicy::improvementFound(best_metrics.cut, initial_cut,
+                                                   best_metrics.imbalance,
+                                                   initial_imbalance, _context.partition.epsilon);
+    }
   }
 
   bool moveAffectsGainOrConnectivityUpdate(const HypernodeID pin_count_target_part_before_move,
@@ -717,6 +798,11 @@ class KWayFMRefiner final : public IRefiner,
   template <bool only_update_cache = false>
   void updateNeighbours(const HypernodeID moved_hn, const PartitionID from_part,
                         const PartitionID to_part) {
+    if (_context.partition.objective == Objective::tob && !only_update_cache) {
+      rebuildPQandGainCacheForTOB();
+      return;
+    }
+    
     _already_processed_part.resetUsedEntries();
 
     bool moved_hn_remains_conntected_to_from_part = false;
@@ -908,6 +994,46 @@ class KWayFMRefiner final : public IRefiner,
       } (), V(moved_hn));
   }
 
+  void rebuildPQandGainCacheForTOB() {
+    _pq.clear();
+    _gain_cache.clear();
+
+    for (const HypernodeID& hn : _hg.nodes()) {
+      if (_hg.marked(hn) || _hg.isFixedVertex(hn)) {
+        continue;
+      }
+
+      if (_hg.isBorderNode(hn)) {
+        if (!_hg.active(hn)) {
+          _hg.activate(hn);
+        }
+        initializeGainCacheFor(hn);
+        insertHNintoPQ(hn);
+      } else if (_hg.active(hn)) {
+        _hg.deactivate(hn);
+      }
+    }
+  }
+
+  void refreshPQEntriesForNode(const HypernodeID hn) {
+    for (PartitionID part = 0; part < _context.partition.k; ++part) {
+      if (_pq.contains(hn, part)) {
+        _pq.remove(hn, part);
+      }
+    }
+
+    _gain_cache.clear(hn);
+    if (!_hg.marked(hn) && !_hg.isFixedVertex(hn) && _hg.isBorderNode(hn)) {
+      if (!_hg.active(hn)) {
+        _hg.activate(hn);
+      }
+      initializeGainCacheFor(hn);
+      insertHNintoPQ(hn);
+    } else if (_hg.active(hn) && !_hg.marked(hn)) {
+      _hg.deactivate(hn);
+    }
+  }
+
   void updatePin(const HypernodeID pin, const PartitionID part, const HyperedgeID he,
                  const Gain delta)
   KAHYPAR_ATTRIBUTE_ALWAYS_INLINE {
@@ -968,6 +1094,13 @@ class KWayFMRefiner final : public IRefiner,
   }
 
   Gain gainInducedByHypergraph(const HypernodeID hn, const PartitionID target_part) const {
+    // Use O(1) TOB gain computation when objective is tob
+    if (_context.partition.objective == Objective::tob && _hg.hasTopologicalLevels()) {
+      const PartitionID source_part = _hg.partID(hn);
+      return _hg.computeTOBGain(hn, source_part, target_part);
+    }
+    
+    // Otherwise use cut-based gain computation
     const PartitionID source_part = _hg.partID(hn);
     Gain gain = 0;
     for (const HyperedgeID& he : _hg.incidentEdges(hn)) {
@@ -992,6 +1125,29 @@ class KWayFMRefiner final : public IRefiner,
   }
 
   void initializeGainCacheFor(const HypernodeID hn) {
+    // For TOB objective, use O(1) gain computation
+    if (_context.partition.objective == Objective::tob && _hg.hasTopologicalLevels()) {
+      const PartitionID source_part = _hg.partID(hn);
+      _tmp_gains.clear();
+      // Compute gains for all adjacent parts
+      for (const HyperedgeID& he : _hg.incidentEdges(hn)) {
+        for (const PartitionID& part : _hg.connectivitySet(he)) {
+          if (part != source_part) {
+            _tmp_gains.add(part, 0);
+          }
+        }
+      }
+      // Initialize gain cache entries with O(1) TOB gains
+      for (const auto& target_part : _tmp_gains) {
+        if (target_part.key != source_part) {
+          const Gain tob_gain = _hg.computeTOBGain(hn, source_part, target_part.key);
+          _gain_cache.initializeEntry(hn, target_part.key, tob_gain);
+        }
+      }
+      return;
+    }
+    
+    // Original cut-based gain computation
     const PartitionID source_part = _hg.partID(hn);
     HyperedgeWeight internal_weight = 0;
 

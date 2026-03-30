@@ -109,27 +109,23 @@ class InitialPartitionerBase {
   void multipleRunsInitialPartitioning() {
     Objective obj = _context.partition.objective;
     HyperedgeWeight best_quality = std::numeric_limits<HyperedgeWeight>::max();
+    HyperedgeWeight best_tiebreak_quality = std::numeric_limits<HyperedgeWeight>::max();
     double best_imbalance = std::numeric_limits<double>::max();
     std::vector<PartitionID> best_partition(_hg.initialNumNodes(), 0);
     for (uint32_t i = 0; i < _context.initial_partitioning.nruns; ++i) {
       // hg.resetPartitioning() is called in initial_partition
       static_cast<Derived*>(this)->initialPartition();
 
-      const HyperedgeWeight current_quality = obj == Objective::cut ?
-                                              metrics::hyperedgeCut(_hg) : metrics::km1(_hg);
+      const HyperedgeWeight current_quality = metrics::objective(_hg, obj);
+      const HyperedgeWeight current_tiebreak_quality = metrics::tieBreakerMetric(_hg, obj);
       const double current_imbalance = metrics::imbalance(_hg, _context);
       DBG << V(obj) << V(current_quality) << V(current_imbalance);
-
-      const bool equal_metric = current_quality == best_quality;
-      const bool improved_metric = current_quality < best_quality;
-      const bool improved_imbalance = current_imbalance < best_imbalance;
-      const bool is_feasible_partition = current_imbalance <= _context.partition.epsilon;
-      const bool is_best_cut_feasible_paritition = best_imbalance <= _context.partition.epsilon;
-
-      if ((improved_metric && (is_feasible_partition || improved_imbalance)) ||
-          (equal_metric && improved_imbalance) ||
-          (is_feasible_partition && !is_best_cut_feasible_paritition)) {
+      if (metrics::isBetterPartition(current_quality, best_quality,
+                                     current_tiebreak_quality, best_tiebreak_quality,
+                                     current_imbalance, best_imbalance,
+                                     _context.partition.epsilon)) {
         best_quality = current_quality;
+        best_tiebreak_quality = current_tiebreak_quality;
         best_imbalance = current_imbalance;
         for (const HypernodeID& hn : _hg.nodes()) {
           best_partition[hn] = _hg.partID(hn);
@@ -172,6 +168,12 @@ class InitialPartitionerBase {
                          _hg, _context));
             LOG << "kway_fm_km1.";
             break;
+          case Objective::tob:
+            refiner = (RefinerFactory::getInstance().createObject(
+                         RefinementAlgorithm::kway_fm,
+                         _hg, _context));
+            LOG << "kway_fm (for tob).";
+            break;
           case Objective::UNDEFINED:
             refiner = (RefinerFactory::getInstance().createObject(
                          RefinementAlgorithm::do_nothing,
@@ -202,6 +204,7 @@ class InitialPartitionerBase {
       std::vector<HypernodeID> refinement_nodes;
       Metrics current_metrics = { metrics::hyperedgeCut(_hg),
                                   metrics::km1(_hg),
+                                  metrics::topologyDifference(_hg),
                                   metrics::imbalance(_hg, _context) };
 
 #ifdef KAHYPAR_USE_ASSERTIONS
@@ -234,9 +237,12 @@ class InitialPartitionerBase {
                             _context.initial_partitioning.upper_allowed_partition_weight[1]
                             + _max_hypernode_weight }, changes, current_metrics);
         ASSERT((current_metrics.cut <= old_cut && current_metrics.cut == metrics::hyperedgeCut(_hg)) ||
-               (current_metrics.km1 <= old_km1 && current_metrics.km1 == metrics::km1(_hg)),
+               (current_metrics.km1 <= old_km1 && current_metrics.km1 == metrics::km1(_hg)) ||
+               (_context.partition.objective == Objective::tob &&
+                current_metrics.tob == metrics::topologyDifference(_hg)),
                V(current_metrics.cut) << V(old_cut) << V(metrics::hyperedgeCut(_hg))
-                                      << V(current_metrics.km1) << V(old_km1) << V(metrics::km1(_hg)));
+                                      << V(current_metrics.km1) << V(old_km1) << V(metrics::km1(_hg))
+                                      << V(current_metrics.tob) << V(metrics::topologyDifference(_hg)));
 
 #ifdef KAHYPAR_USE_ASSERTIONS
         old_cut = current_metrics.cut;

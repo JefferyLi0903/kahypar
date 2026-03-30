@@ -101,6 +101,7 @@ enum class RefinementAlgorithm : uint8_t {
   kway_hyperflow_cutter,
   kway_fm_hyperflow_cutter,
   kway_fm_hyperflow_cutter_km1,
+  tob_refine,
   do_nothing,
   UNDEFINED
 };
@@ -119,6 +120,7 @@ enum class InitialPartitionerAlgorithm : uint8_t {
   random,
   lp,
   bin_packing,
+  tob_super_far,
   pool,
   UNDEFINED
 };
@@ -146,6 +148,7 @@ enum class RefinementStoppingRule : uint8_t {
 enum class Objective : uint8_t {
   cut,
   km1,
+  tob,
   UNDEFINED
 };
 enum class EvoReplaceStrategy : uint8_t {
@@ -310,6 +313,7 @@ static std::ostream& operator<< (std::ostream& os, const Objective& objective) {
   switch (objective) {
     case Objective::cut: return os << "cut";
     case Objective::km1: return os << "km1";
+    case Objective::tob: return os << "tob";
     case Objective::UNDEFINED: return os << "UNDEFINED";
       // omit default case to trigger compiler warning for missing cases
   }
@@ -348,6 +352,7 @@ static std::ostream& operator<< (std::ostream& os, const RefinementAlgorithm& al
     case RefinementAlgorithm::kway_hyperflow_cutter: return os << "kway_hyperflow_cutter";
     case RefinementAlgorithm::kway_fm_hyperflow_cutter: return os << "kway_fm_hyperflow_cutter";
     case RefinementAlgorithm::kway_fm_hyperflow_cutter_km1: return os << "kway_fm_hyperflow_cutter_km1";
+    case RefinementAlgorithm::tob_refine: return os << "tob_refine";
     case RefinementAlgorithm::do_nothing: return os << "do_nothing";
     case RefinementAlgorithm::UNDEFINED: return os << "UNDEFINED";
       // omit default case to trigger compiler warning for missing cases
@@ -370,6 +375,7 @@ static std::ostream& operator<< (std::ostream& os, const InitialPartitionerAlgor
     case InitialPartitionerAlgorithm::random: return os << "random";
     case InitialPartitionerAlgorithm::lp: return os << "lp";
     case InitialPartitionerAlgorithm::bin_packing: return os << "bin_packing";
+    case InitialPartitionerAlgorithm::tob_super_far: return os << "tob_super_far";
     case InitialPartitionerAlgorithm::pool: return os << "pool";
     case InitialPartitionerAlgorithm::UNDEFINED: return os << "UNDEFINED";
       // omit default case to trigger compiler warning for missing cases
@@ -551,6 +557,8 @@ static RefinementAlgorithm refinementAlgorithmFromString(const std::string& type
     return RefinementAlgorithm::twoway_fm_hyperflow_cutter;
   } else if (type == "kway_fm_hyperflow_cutter_km1") {
     return RefinementAlgorithm::kway_fm_hyperflow_cutter_km1;
+  } else if (type == "tob_refine") {
+    return RefinementAlgorithm::tob_refine;
   } else if (type == "do_nothing") {
     return RefinementAlgorithm::do_nothing;
   }
@@ -584,6 +592,8 @@ static InitialPartitionerAlgorithm initialPartitioningAlgorithmFromString(const 
     return InitialPartitionerAlgorithm::bfs;
   } else if (mode == "random") {
     return InitialPartitionerAlgorithm::random;
+  } else if (mode == "tob_super_far") {
+    return InitialPartitionerAlgorithm::tob_super_far;
   } else if (mode == "pool") {
     return InitialPartitionerAlgorithm::pool;
   }

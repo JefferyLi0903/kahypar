@@ -70,8 +70,7 @@ static inline void partition(Hypergraph& hypergraph,
     if (!context.partition.quiet_mode && context.partition.verbose_output && context.type == ContextType::main) {
       LOG << "Initial Partitioning Result:";
       LOG << "Initial" << context.partition.objective << "      ="
-          << (context.partition.objective == Objective::cut ? metrics::hyperedgeCut(hypergraph) :
-          metrics::km1(hypergraph));
+          << metrics::objective(hypergraph, context.partition.objective);
       LOG << "Initial imbalance =" << metrics::imbalance(hypergraph, context);
       LOG << "Initial part sizes and weights:";
       io::printPartSizesAndWeights(hypergraph);

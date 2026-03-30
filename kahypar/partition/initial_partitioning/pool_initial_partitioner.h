@@ -46,16 +46,21 @@ class PoolInitialPartitioner : public IInitialPartitioner,
   class PartitioningResult {
  public:
     PartitioningResult(InitialPartitionerAlgorithm algo, Objective objective,
-                       HyperedgeWeight quality, double imbalance) :
+                       HyperedgeWeight quality, double imbalance,
+                       HyperedgeWeight tiebreak_quality = kInvalidCut) :
       algo(algo),
       objective(objective),
       quality(quality),
-      imbalance(imbalance) { }
+      imbalance(imbalance),
+      tiebreak_quality(tiebreak_quality) { }
 
     void print_result(const std::string& desc) const {
       if (objective == Objective::cut) {
         LOG << desc << "=" << "[ Cut=" << quality << "- Imbalance=" << imbalance << "- Algorithm="
             << algo << "]";
+      } else if (objective == Objective::tob) {
+        LOG << desc << "=" << "[ TOB=" << quality << "- Cut=" << tiebreak_quality
+            << "- Imbalance=" << imbalance << "- Algorithm=" << algo << "]";
       } else {
         LOG << desc << "=" << "[ Km1=" << quality << "- Imbalance=" << imbalance << "- Algorithm="
             << algo << "]";
@@ -66,6 +71,7 @@ class PoolInitialPartitioner : public IInitialPartitioner,
     Objective objective;
     HyperedgeWeight quality;
     double imbalance;
+    HyperedgeWeight tiebreak_quality;
   };
 
  public:
@@ -136,36 +142,35 @@ class PoolInitialPartitioner : public IInitialPartitioner,
       std::unique_ptr<IInitialPartitioner> partitioner(
         InitialPartitioningFactory::getInstance().createObject(algo, _hg, _context));
       partitioner->partition();
-      HyperedgeWeight current_quality = obj == Objective::cut ?
-                                        metrics::hyperedgeCut(_hg) : metrics::km1(_hg);
+      const HyperedgeWeight current_quality = metrics::objective(_hg, obj);
+      const HyperedgeWeight current_tiebreak_quality = metrics::tieBreakerMetric(_hg, obj);
       double current_imbalance = metrics::imbalance(_hg, _context);
       DBG << algo << V(obj) << V(current_quality) << V(current_imbalance);
-
-      const bool equal_metric = current_quality == best_cut.quality;
-      const bool improved_metric = current_quality < best_cut.quality;
-      const bool improved_imbalance = current_imbalance < best_cut.imbalance;
-      const bool is_feasible_partition = current_imbalance <= _context.partition.epsilon;
-      const bool is_best_cut_feasible_paritition = best_cut.imbalance <= _context.partition.epsilon;
-
-      if ((improved_metric && (is_feasible_partition || improved_imbalance)) ||
-          (equal_metric && improved_imbalance) ||
-          (is_feasible_partition && !is_best_cut_feasible_paritition)) {
+      if (metrics::isBetterPartition(current_quality, best_cut.quality,
+                                     current_tiebreak_quality, best_cut.tiebreak_quality,
+                                     current_imbalance, best_cut.imbalance,
+                                     _context.partition.epsilon)) {
         for (const HypernodeID& hn : _hg.nodes()) {
           best_partition[hn] = _hg.partID(hn);
         }
-        applyPartitioningResults(best_cut, current_quality, current_imbalance, algo);
+        applyPartitioningResults(best_cut, current_quality, current_imbalance, algo,
+                                 current_tiebreak_quality);
       }
       if (current_quality < min_cut.quality) {
-        applyPartitioningResults(min_cut, current_quality, current_imbalance, algo);
+        applyPartitioningResults(min_cut, current_quality, current_imbalance, algo,
+                                 current_tiebreak_quality);
       }
       if (current_quality > max_cut.quality) {
-        applyPartitioningResults(max_cut, current_quality, current_imbalance, algo);
+        applyPartitioningResults(max_cut, current_quality, current_imbalance, algo,
+                                 current_tiebreak_quality);
       }
       if (current_imbalance < min_imbalance.imbalance) {
-        applyPartitioningResults(min_imbalance, current_quality, current_imbalance, algo);
+        applyPartitioningResults(min_imbalance, current_quality, current_imbalance, algo,
+                                 current_tiebreak_quality);
       }
       if (current_imbalance > max_imbalance.imbalance) {
-        applyPartitioningResults(max_imbalance, current_quality, current_imbalance, algo);
+        applyPartitioningResults(max_imbalance, current_quality, current_imbalance, algo,
+                                 current_tiebreak_quality);
       }
     }
 
@@ -206,10 +211,12 @@ class PoolInitialPartitioner : public IInitialPartitioner,
 
   void applyPartitioningResults(PartitioningResult& result, const HyperedgeWeight quality,
                                 const double imbalance,
-                                const InitialPartitionerAlgorithm algo) const {
+                                const InitialPartitionerAlgorithm algo,
+                                const HyperedgeWeight tiebreak_quality) const {
     result.quality = quality;
     result.imbalance = imbalance;
     result.algo = algo;
+    result.tiebreak_quality = tiebreak_quality;
   }
 
   using Base::_hg;

@@ -1,0 +1,26 @@
+[
+  {
+    "graph": "ibm01.dah",
+    "status_cut_run": "failed_rc_15",
+    "runtime_cut_sec": 266.77,
+    "nodes": 4061,
+    "edges": 9128,
+    "cut_error": "",
+    "tob_partition_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm01.dah.part8.epsilon0.03.seed1.KaHyPar.tob_backup",
+    "tob_cut": 877,
+    "tob_tob_scaled": 21833421757,
+    "tob_imbalance": 0.029527559055118058
+  },
+  {
+    "graph": "ibm02.dah",
+    "status_cut_run": "failed_rc_-9",
+    "runtime_cut_sec": 11.71,
+    "nodes": 5087,
+    "edges": 14270,
+    "cut_error": "",
+    "tob_partition_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm02.dah.part8.epsilon0.03.seed1.KaHyPar.tob_backup",
+    "tob_cut": 8684,
+    "tob_tob_scaled": 5449768079,
+    "tob_imbalance": 0.029874213836478036
+  }
+]

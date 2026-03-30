@@ -1,0 +1,104 @@
+[
+  {
+    "graph": "ibm02.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 5087,
+    "edges": 14270,
+    "cut": {
+      "status": "timeout",
+      "runtime_sec": 420.02,
+      "error": "",
+      "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm02.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 5449768079,
+      "cut": 8684,
+      "imbalance": 0.029874213836478036
+    },
+    "tob": {
+      "status": "ok",
+      "runtime_sec": 93.43,
+      "error": "",
+      "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm02.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 5449768079,
+      "cut": 8684,
+      "imbalance": 0.029874213836478036
+    },
+    "delta_tob_cut_minus_tob": 0,
+    "delta_cut_tob_minus_cut": 0
+  },
+  {
+    "graph": "ibm03.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 5085,
+    "edges": 15289,
+    "cut": {
+      "status": "failed_rc_-9",
+      "runtime_sec": 367.56,
+      "error": "",
+      "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm03.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 10615522092,
+      "cut": 9588,
+      "imbalance": 0.029874213836478036
+    },
+    "tob": {
+      "status": "failed_rc_-9",
+      "runtime_sec": 14.13,
+      "error": "",
+      "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm03.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 10615522092,
+      "cut": 9588,
+      "imbalance": 0.029874213836478036
+    },
+    "delta_tob_cut_minus_tob": 0,
+    "delta_cut_tob_minus_cut": 0
+  },
+  {
+    "graph": "ibm04.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 6105,
+    "edges": 19738,
+    "cut": {
+      "status": "failed_rc_-9",
+      "runtime_sec": 10.33,
+      "error": "",
+      "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm04.dah.part8.epsilon0.03.seed1.KaHyPar.cut",
+      "tob_scaled": 6681242825,
+      "cut": 8160,
+      "imbalance": 0.027486910994764413
+    },
+    "tob": {
+      "status": "failed_rc_-9",
+      "runtime_sec": 11.66,
+      "error": "",
+      "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm04.dah.part8.epsilon0.03.seed1.KaHyPar.tob",
+      "tob_scaled": 6681242825,
+      "cut": 8160,
+      "imbalance": 0.027486910994764413
+    },
+    "delta_tob_cut_minus_tob": 0,
+    "delta_cut_tob_minus_cut": 0
+  },
+  {
+    "graph": "ibm05.dah",
+    "k": 8,
+    "epsilon": 0.03,
+    "seed": 1,
+    "nodes": 8128,
+    "edges": 21135,
+    "cut": {
+      "status": "failed_rc_-9",
+      "runtime_sec": 28.53,
+      "error": ""
+    },
+    "tob": {
+      "status": "failed_rc_-9",
+      "runtime_sec": 23.47,
+      "error": ""
+    }
+  }
+]

@@ -258,6 +258,11 @@ static inline Hypergraph createHypergraphFromFile(const std::string& filename,
                     num_parts, &hyperedge_weights, &hypernode_weights);
 }
 
+static inline bool hasFileExtension(const std::string& filename, const std::string& extension) {
+  return filename.size() >= extension.size() &&
+         filename.compare(filename.size() - extension.size(), extension.size(), extension) == 0;
+}
+
 
 static inline void writeHypernodeWeights(std::ofstream& out_stream, const Hypergraph& hypergraph) {
   for (const HypernodeID& hn : hypergraph.nodes()) {
@@ -487,5 +492,348 @@ static inline void writeFixedVertexFile(const Hypergraph& hypergraph, const std:
   }
   out_stream.close();
 }
+
+// ==================== Topological Level I/O for TOB Objective ====================
+
+/*!
+ * Reads topological levels from a file.
+ * File format: one level per line, where line i contains the level of hypernode i.
+ * Levels are 0-indexed integers.
+ *
+ * \param hypergraph The hypergraph to set topological levels for
+ * \param filename Path to the topological levels file
+ */
+static inline void readTopologicalLevelFile(Hypergraph& hypergraph, const std::string& filename) {
+  ASSERT(!filename.empty(), "No filename for topological level file specified");
+  std::ifstream file(filename);
+  if (file) {
+    int32_t level;
+    HypernodeID hn = 0;
+    while (file >> level) {
+      if (hn < hypergraph.initialNumNodes()) {
+        hypergraph.setTopologicalLevel(hn, level);
+      }
+      ++hn;
+    }
+    file.close();
+    if (hn != hypergraph.initialNumNodes()) {
+      LOG << "Warning: Topological level file has " << hn << " entries, but hypergraph has "
+          << hypergraph.initialNumNodes() << " nodes.";
+    }
+  } else {
+    ERROR("Topological level file not found: " << filename);
+  }
+}
+
+/*!
+ * Writes topological levels to a file.
+ * File format: one level per line, where line i contains the level of hypernode i.
+ *
+ * \param hypergraph The hypergraph with topological levels
+ * \param filename Path to write the topological levels file
+ */
+static inline void writeTopologicalLevelFile(const Hypergraph& hypergraph, const std::string& filename) {
+  ASSERT(!filename.empty(), "No filename for topological level file specified");
+  if (!hypergraph.hasTopologicalLevels()) {
+    LOG << "Warning: Hypergraph does not have topological levels. Writing empty file.";
+  }
+  std::ofstream out_stream(filename.c_str());
+  for (const HypernodeID& hn : hypergraph.nodes()) {
+    if (hypergraph.hasTopologicalLevels()) {
+      out_stream << hypergraph.topologicalLevel(hn) << std::endl;
+    } else {
+      out_stream << 0 << std::endl;
+    }
+  }
+  out_stream.close();
+}
+
+/*!
+ * Reads a Directed Acyclic Hypergraph (DAH) file and computes topological levels.
+ * 
+ * DAH file format (extension: .dah):
+ * Line 1: <num_hyperedges> <num_hypernodes> [type]
+ * Following lines: Each hyperedge is represented as:
+ *   [weight] <source_pins...> -> <target_pins...>
+ * 
+ * The "->" separator distinguishes source pins (tail) from target pins (head).
+ * Topological levels are computed such that for each directed hyperedge,
+ * all source pins have levels strictly less than all target pins.
+ *
+ * \param filename Path to the DAH file
+ * \param num_hypernodes Output: number of hypernodes
+ * \param num_hyperedges Output: number of hyperedges
+ * \param index_vector Output: hyperedge index vector
+ * \param edge_vector Output: pin vector (all pins, sources and targets combined)
+ * \param topological_levels Output: computed topological levels for each node
+ * \param hyperedge_weights Optional output: hyperedge weights
+ * \param hypernode_weights Optional output: hypernode weights
+ */
+static inline void readDAHFile(const std::string& filename,
+                               HypernodeID& num_hypernodes,
+                               HyperedgeID& num_hyperedges,
+                               HyperedgeIndexVector& index_vector,
+                               HyperedgeVector& edge_vector,
+                               std::vector<int32_t>& topological_levels,
+                               HyperedgeWeightVector* hyperedge_weights = nullptr,
+                               HypernodeWeightVector* hypernode_weights = nullptr) {
+  ASSERT(!filename.empty(), "No filename for DAH file specified");
+  std::ifstream file(filename);
+  size_t line_number = 0;
+  
+  if (!file) {
+    ERROR("DAH file not found: " << filename);
+  }
+  
+  // Read header
+  HypergraphType hypergraph_type = HypergraphType::Unweighted;
+  readHGRHeader(file, num_hyperedges, num_hypernodes, hypergraph_type, line_number);
+  
+  const bool has_hyperedge_weights = hypergraph_type == HypergraphType::EdgeWeights ||
+                                     hypergraph_type == HypergraphType::EdgeAndNodeWeights;
+  const bool has_hypernode_weights = hypergraph_type == HypergraphType::NodeWeights ||
+                                     hypergraph_type == HypergraphType::EdgeAndNodeWeights;
+  
+  // Data structures for DAG representation.
+  // We store a deduplicated successor list so Kahn's algorithm remains exact
+  // even if multiple hyperedges induce the same precedence relation.
+  std::vector<std::unordered_set<HypernodeID>> successors(num_hypernodes);
+  std::vector<int32_t> in_degree(num_hypernodes, 0);
+  
+  index_vector.reserve(static_cast<size_t>(num_hyperedges) + 1);
+  index_vector.push_back(0);
+  
+  std::string line;
+  for (HyperedgeID he = 0; he < num_hyperedges; ++he) {
+    if (!getNextLine(file, line, line_number)) {
+      ERROR("Unexpected end of file at hyperedge " << he);
+    }
+    
+    // Parse the line: [weight] source_pins... -> target_pins...
+    std::istringstream line_stream(line);
+    
+    if (has_hyperedge_weights) {
+      HyperedgeWeight weight;
+      line_stream >> weight;
+      if (hyperedge_weights != nullptr) {
+        hyperedge_weights->push_back(weight);
+      }
+    }
+    
+    std::vector<HypernodeID> source_pins;
+    std::vector<HypernodeID> target_pins;
+    bool reading_targets = false;
+    std::string token;
+    
+    while (line_stream >> token) {
+      if (token == "->") {
+        reading_targets = true;
+        continue;
+      }
+      
+      HypernodeID pin = static_cast<HypernodeID>(std::stoul(token));
+      if (pin == 0) {
+        ERROR("Invalid index 0 for pin. Vertex indices start with 1", line_number);
+      }
+      --pin;  // Convert to 0-based indexing
+      
+      if (reading_targets) {
+        target_pins.push_back(pin);
+      } else {
+        source_pins.push_back(pin);
+      }
+    }
+    
+    // If no "->" found, treat all pins as undirected (no ordering constraint)
+    if (!reading_targets) {
+      // All pins go to edge_vector, no ordering constraints
+      for (const HypernodeID& pin : source_pins) {
+        edge_vector.push_back(pin);
+      }
+    } else {
+      // Add all pins to edge_vector
+      for (const HypernodeID& pin : source_pins) {
+        edge_vector.push_back(pin);
+      }
+      for (const HypernodeID& pin : target_pins) {
+        edge_vector.push_back(pin);
+      }
+      
+      // Add ordering constraints: all sources must come before all targets
+      for (const HypernodeID& target : target_pins) {
+        for (const HypernodeID& source : source_pins) {
+          if (source != target) {
+            if (successors[source].insert(target).second) {
+              ++in_degree[target];
+            }
+          }
+        }
+      }
+    }
+    
+    index_vector.push_back(edge_vector.size());
+  }
+  
+  // Read hypernode weights if present
+  if (has_hypernode_weights && hypernode_weights != nullptr) {
+    for (HypernodeID hn = 0; hn < num_hypernodes; ++hn) {
+      if (!getNextLine(file, line, line_number)) {
+        ERROR("Unexpected end of file while reading hypernode weights");
+      }
+      std::istringstream line_stream(line);
+      HypernodeWeight weight;
+      line_stream >> weight;
+      hypernode_weights->push_back(weight);
+    }
+  }
+  
+  file.close();
+  
+  // Compute topological levels using Kahn's algorithm
+  topological_levels.resize(num_hypernodes, 0);
+  std::vector<HypernodeID> queue;
+  
+  // Initialize queue with nodes having no predecessors
+  for (HypernodeID hn = 0; hn < num_hypernodes; ++hn) {
+    if (in_degree[hn] == 0) {
+      queue.push_back(hn);
+      topological_levels[hn] = 0;
+    }
+  }
+  
+  size_t processed = 0;
+  size_t queue_start = 0;
+  
+  while (queue_start < queue.size()) {
+    HypernodeID current = queue[queue_start++];
+    ++processed;
+    
+    for (const HypernodeID successor : successors[current]) {
+      --in_degree[successor];
+      // Update level: successor's level must be at least current's level + 1
+      topological_levels[successor] = std::max(topological_levels[successor],
+                                               topological_levels[current] + 1);
+      if (in_degree[successor] == 0) {
+        queue.push_back(successor);
+      }
+    }
+  }
+  
+  if (processed != num_hypernodes) {
+    LOG << "Warning: DAH contains a cycle. " << processed << " of " << num_hypernodes
+        << " nodes were processed. Remaining nodes assigned level 0.";
+  }
+}
+
+/*!
+ * Creates a hypergraph from a DAH file with topological levels.
+ *
+ * \param filename Path to the DAH file
+ * \param num_parts Number of partitions
+ * \return Hypergraph with topological levels set
+ */
+static inline Hypergraph createHypergraphFromDAHFile(const std::string& filename,
+                                                     const PartitionID num_parts) {
+  HypernodeID num_hypernodes;
+  HyperedgeID num_hyperedges;
+  HyperedgeIndexVector index_vector;
+  HyperedgeVector edge_vector;
+  std::vector<int32_t> topological_levels;
+  HyperedgeWeightVector hyperedge_weights;
+  HypernodeWeightVector hypernode_weights;
+  
+  readDAHFile(filename, num_hypernodes, num_hyperedges, index_vector, edge_vector,
+              topological_levels, &hyperedge_weights, &hypernode_weights);
+  
+  Hypergraph hypergraph(num_hypernodes, num_hyperedges, index_vector, edge_vector,
+                        num_parts, &hyperedge_weights, &hypernode_weights);
+  
+  // Set topological levels
+  hypergraph.setTopologicalLevels(topological_levels);
+  
+  return hypergraph;
+}
+
+static inline Hypergraph createHypergraphFromInputFile(const std::string& graph_filename,
+                                                       const PartitionID num_parts,
+                                                       const std::string& topological_level_filename = "",
+                                                       const bool validate_input = true,
+                                                       const bool promote_warnings_to_errors = true) {
+  Hypergraph hypergraph = hasFileExtension(graph_filename, ".dah") ?
+    createHypergraphFromDAHFile(graph_filename, num_parts) :
+    createHypergraphFromFile(graph_filename, num_parts, validate_input, promote_warnings_to_errors);
+
+  if (!topological_level_filename.empty()) {
+    readTopologicalLevelFile(hypergraph, topological_level_filename);
+  }
+
+  return hypergraph;
+}
+
+/*!
+ * Computes topological levels for a hypergraph based on hyperedge structure.
+ * This assumes hyperedges represent directed dependencies where the first pin
+ * is the "source" and remaining pins are "targets".
+ * 
+ * For undirected hypergraphs, all nodes get level 0.
+ *
+ * \param hypergraph The hypergraph to compute levels for
+ * \param source_pin_index Index of the source pin in each hyperedge (default: 0)
+ */
+static inline void computeTopologicalLevelsFromHypergraph(Hypergraph& hypergraph,
+                                                          size_t source_pin_index = 0) {
+  const HypernodeID num_nodes = hypergraph.initialNumNodes();
+  std::vector<int32_t> levels(num_nodes, 0);
+  std::vector<int32_t> in_degree(num_nodes, 0);
+  std::vector<std::vector<HypernodeID>> successors(num_nodes);
+  
+  // Build dependency graph from hyperedges
+  // Assumption: first pin is source, rest are targets
+  for (const HyperedgeID& he : hypergraph.edges()) {
+    if (hypergraph.edgeSize(he) <= 1) continue;
+    
+    std::vector<HypernodeID> pins;
+    for (const HypernodeID& pin : hypergraph.pins(he)) {
+      pins.push_back(pin);
+    }
+    
+    if (source_pin_index >= pins.size()) continue;
+    
+    HypernodeID source = pins[source_pin_index];
+    for (size_t i = 0; i < pins.size(); ++i) {
+      if (i != source_pin_index) {
+        HypernodeID target = pins[i];
+        if (source != target) {
+          successors[source].push_back(target);
+          ++in_degree[target];
+        }
+      }
+    }
+  }
+  
+  // Kahn's algorithm for topological sort with level computation
+  std::vector<HypernodeID> queue;
+  for (HypernodeID hn = 0; hn < num_nodes; ++hn) {
+    if (in_degree[hn] == 0) {
+      queue.push_back(hn);
+    }
+  }
+  
+  size_t queue_start = 0;
+  while (queue_start < queue.size()) {
+    HypernodeID current = queue[queue_start++];
+    
+    for (const HypernodeID& successor : successors[current]) {
+      levels[successor] = std::max(levels[successor], levels[current] + 1);
+      --in_degree[successor];
+      if (in_degree[successor] == 0) {
+        queue.push_back(successor);
+      }
+    }
+  }
+  
+  hypergraph.setTopologicalLevels(levels);
+}
+
 }  // namespace io
 }  // namespace kahypar

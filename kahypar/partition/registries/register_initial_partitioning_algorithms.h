@@ -78,6 +78,8 @@ REGISTER_INITIAL_PARTITIONER(InitialPartitionerAlgorithm::bfs, BFSInitialPartiti
 REGISTER_INITIAL_PARTITIONER(InitialPartitionerAlgorithm::lp, LPInitialPartitionerBFS_FM);
 REGISTER_INITIAL_PARTITIONER(InitialPartitionerAlgorithm::bin_packing,
                              BinPackingInitialPartitioner);
+REGISTER_INITIAL_PARTITIONER(InitialPartitionerAlgorithm::tob_super_far,
+                             TOBSuperFarInitialPartitioner);
 REGISTER_INITIAL_PARTITIONER(InitialPartitionerAlgorithm::greedy_sequential,
                              GHGInitialPartitionerBFS_FM_SEQ);
 REGISTER_INITIAL_PARTITIONER(InitialPartitionerAlgorithm::greedy_global,

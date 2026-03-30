@@ -222,6 +222,7 @@ inline std::ostream& operator<< (std::ostream& str, const LocalSearchParameters&
   if (params.algorithm == RefinementAlgorithm::twoway_fm ||
       params.algorithm == RefinementAlgorithm::kway_fm ||
       params.algorithm == RefinementAlgorithm::kway_fm_km1 ||
+      params.algorithm == RefinementAlgorithm::tob_refine ||
       params.algorithm == RefinementAlgorithm::twoway_fm_hyperflow_cutter ||
       params.algorithm == RefinementAlgorithm::kway_fm_hyperflow_cutter_km1 ||
       params.algorithm == RefinementAlgorithm::kway_fm_hyperflow_cutter) {
@@ -235,6 +236,7 @@ inline std::ostream& operator<< (std::ostream& str, const LocalSearchParameters&
   if (params.algorithm == RefinementAlgorithm::twoway_fm ||
       params.algorithm == RefinementAlgorithm::kway_fm ||
       params.algorithm == RefinementAlgorithm::kway_fm_km1 ||
+      params.algorithm == RefinementAlgorithm::tob_refine ||
       params.algorithm == RefinementAlgorithm::twoway_fm_hyperflow_cutter ||
       params.algorithm == RefinementAlgorithm::kway_fm_hyperflow_cutter_km1 ||
       params.algorithm == RefinementAlgorithm::kway_fm_hyperflow_cutter) {
@@ -306,6 +308,11 @@ inline std::ostream& operator<< (std::ostream& str, const InitialPartitioningPar
 struct PartitioningParameters {
   Mode mode = Mode::UNDEFINED;
   Objective objective = Objective::UNDEFINED;
+  double tob_beta = 0.2;
+  double tob_gamma = 1.0;
+  double tob_delta = 10000.0;
+  double tob_zeta = 1.0;
+  bool tob_enable_io_bram_constraints = false;
   double epsilon = std::numeric_limits<double>::max();
   PartitionID k = std::numeric_limits<PartitionID>::max();
   PartitionID rb_lower_k = 0;
@@ -339,6 +346,7 @@ struct PartitioningParameters {
   bool write_partition_file = false;
 
   std::string graph_filename { };
+  std::string topological_levels_filename { };
   std::string graph_partition_filename { };
   std::string fixed_vertex_filename { };
   std::string input_partition_filename { };
@@ -347,6 +355,9 @@ struct PartitioningParameters {
 inline std::ostream& operator<< (std::ostream& str, const PartitioningParameters& params) {
   str << "Partitioning Parameters:" << std::endl;
   str << "  Hypergraph:                         " << params.graph_filename << std::endl;
+  if (!params.topological_levels_filename.empty()) {
+    str << "  Topological Levels:                " << params.topological_levels_filename << std::endl;
+  }
   str << "  Partition File:                     " << params.graph_partition_filename << std::endl;
   if (!params.fixed_vertex_filename.empty()) {
     str << "  Fixed Vertex File:                  " << params.fixed_vertex_filename << std::endl;
@@ -356,6 +367,13 @@ inline std::ostream& operator<< (std::ostream& str, const PartitioningParameters
   }
   str << "  Mode:                               " << params.mode << std::endl;
   str << "  Objective:                          " << params.objective << std::endl;
+  if (params.objective == Objective::tob) {
+    str << "  TOB beta/gamma/delta/zeta:         "
+        << params.tob_beta << "/" << params.tob_gamma << "/"
+        << params.tob_delta << "/" << params.tob_zeta << std::endl;
+    str << "  TOB IO/BRAM constraints:           "
+        << std::boolalpha << params.tob_enable_io_bram_constraints << std::endl;
+  }
   str << "  k:                                  " << params.k << std::endl;
   str << "  epsilon:                            " << params.epsilon << std::endl;
   str << "  seed:                               " << params.seed << std::endl;
@@ -530,6 +548,7 @@ inline std::ostream& operator<< (std::ostream& str, const Context& context) {
 static inline void checkRecursiveBisectionMode(RefinementAlgorithm& algo) {
   if (algo == RefinementAlgorithm::kway_fm ||
       algo == RefinementAlgorithm::kway_fm_km1 ||
+      algo == RefinementAlgorithm::tob_refine ||
       algo == RefinementAlgorithm::kway_hyperflow_cutter ||
       algo == RefinementAlgorithm::kway_fm_hyperflow_cutter ||
       algo == RefinementAlgorithm::kway_fm_hyperflow_cutter_km1) {
@@ -542,7 +561,9 @@ static inline void checkRecursiveBisectionMode(RefinementAlgorithm& algo) {
     std::cin >> answer;
     answer = std::toupper(answer);
     if (answer == 'Y') {
-      if (algo == RefinementAlgorithm::kway_fm || algo == RefinementAlgorithm::kway_fm_km1) {
+      if (algo == RefinementAlgorithm::kway_fm ||
+          algo == RefinementAlgorithm::kway_fm_km1 ||
+          algo == RefinementAlgorithm::tob_refine) {
         algo = RefinementAlgorithm::twoway_fm;
       } else if (algo == RefinementAlgorithm::kway_hyperflow_cutter) {
         algo = RefinementAlgorithm::twoway_hyperflow_cutter;
@@ -605,7 +626,9 @@ static inline void sanityCheck(const Hypergraph& hypergraph, Context& context) {
       // partitioning algorithm as a flat algorithm.
       ALWAYS_ASSERT(context.initial_partitioning.technique == InitialPartitioningTechnique::flat,
                     context.initial_partitioning.technique);
-      checkRecursiveBisectionMode(context.local_search.algorithm);
+      if (context.partition.objective != Objective::tob) {
+        checkRecursiveBisectionMode(context.local_search.algorithm);
+      }
       break;
     case Mode::direct_kway:
       // When KaHyPar runs in direct k-way mode, it makes no sense to use the initial
@@ -625,7 +648,9 @@ static inline void sanityCheck(const Hypergraph& hypergraph, Context& context) {
   }
   switch (context.initial_partitioning.mode) {
     case Mode::recursive_bisection:
-      checkRecursiveBisectionMode(context.initial_partitioning.local_search.algorithm);
+      if (context.partition.objective != Objective::tob) {
+        checkRecursiveBisectionMode(context.initial_partitioning.local_search.algorithm);
+      }
       break;
     case Mode::direct_kway:
       // If the main partitioner runs in recursive bisection mode, then the initial
@@ -711,6 +736,14 @@ static inline void sanityCheck(const Hypergraph& hypergraph, Context& context) {
       LOG << "\nRefinement algorithm" << context.local_search.algorithm
           << "currently only works for cut optimization.";
       LOG << "Please use the corresponding connectivity (km1) algorithm.";
+      std::exit(0);
+    }
+  } else if (context.partition.mode == Mode::direct_kway &&
+             context.partition.objective == Objective::tob) {
+    if (context.local_search.algorithm != RefinementAlgorithm::tob_refine &&
+        context.local_search.algorithm != RefinementAlgorithm::do_nothing) {
+      LOG << "\nRefinement algorithm " << context.local_search.algorithm
+          << " is not TOB-aware. Please use tob_refine (or do_nothing).";
       std::exit(0);
     }
   }

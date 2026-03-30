@@ -1,0 +1,18 @@
+{
+  "case": "benchmarks/dah/fork_join.dah",
+  "k": 4,
+  "epsilon": 0.03,
+  "seed": 1,
+  "cut_partition": {
+    "tob_scaled": 937500000,
+    "cut": 4
+  },
+  "tob_partition": {
+    "tob_scaled": 687500000,
+    "cut": 2
+  },
+  "delta": {
+    "tob_cut_minus_tob": 250000000,
+    "cut_tob_minus_cut": -2
+  }
+}

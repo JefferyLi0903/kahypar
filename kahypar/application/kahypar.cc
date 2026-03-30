@@ -40,10 +40,12 @@ int main(int argc, char* argv[]) {
   kahypar::processCommandLineInput(context, argc, argv);
 
   kahypar::Hypergraph hypergraph(
-    kahypar::io::createHypergraphFromFile(context.partition.graph_filename,
-                                          context.partition.k,
-                                          VALIDATE_INPUT,
-                                          PROMOTE_WARNINGS_TO_ERRORS));
+    kahypar::io::createHypergraphFromInputFile(context.partition.graph_filename,
+                                               context.partition.k,
+                                               context.partition.topological_levels_filename,
+                                               VALIDATE_INPUT,
+                                               PROMOTE_WARNINGS_TO_ERRORS));
+  kahypar::validateTopologyObjectiveConfiguration(context, hypergraph);
 
   kahypar::SerializeOnSignal::initialize(hypergraph, context);
 

@@ -95,8 +95,20 @@ void kahypar_set_fixed_vertices(kahypar_hypergraph_t* kahypar_hypergraph,
 
 kahypar_hypergraph_t* kahypar_create_hypergraph_from_file(const char* file_name, const kahypar_partition_id_t num_blocks) {
   kahypar::Hypergraph* hypergraph = new kahypar::Hypergraph();
-  *hypergraph = kahypar::io::createHypergraphFromFile(file_name, num_blocks, VALIDATE_INPUT, PROMOTE_WARNINGS_TO_ERRORS);
+  *hypergraph = kahypar::io::createHypergraphFromInputFile(file_name, num_blocks, "", VALIDATE_INPUT, PROMOTE_WARNINGS_TO_ERRORS);
   return reinterpret_cast<kahypar_hypergraph_t*>(hypergraph);
+}
+
+kahypar_hypergraph_t* kahypar_create_hypergraph_from_dah_file(const char* file_name, const kahypar_partition_id_t num_blocks) {
+  kahypar::Hypergraph* hypergraph = new kahypar::Hypergraph();
+  *hypergraph = kahypar::io::createHypergraphFromDAHFile(file_name, num_blocks);
+  return reinterpret_cast<kahypar_hypergraph_t*>(hypergraph);
+}
+
+void kahypar_set_topological_levels_from_file(kahypar_hypergraph_t* kahypar_hypergraph,
+                                              const char* file_name) {
+  kahypar::Hypergraph& hypergraph = *reinterpret_cast<kahypar::Hypergraph*>(kahypar_hypergraph);
+  kahypar::io::readTopologicalLevelFile(hypergraph, file_name);
 }
 
 kahypar_hypergraph_t* kahypar_create_hypergraph(const kahypar_partition_id_t num_blocks,
@@ -166,6 +178,7 @@ void kahypar_partition_hypergraph(kahypar_hypergraph_t* kahypar_hypergraph,
   context.partition.k = num_blocks;
   context.partition.epsilon = epsilon;
   context.partition.write_partition_file = false;
+  kahypar::validateTopologyObjectiveConfiguration(context, hypergraph);
 
   if (context.partition.vcycle_refinement_for_input_partition) {
     for (const auto hn : hypergraph.nodes()) {
@@ -342,6 +355,11 @@ KAHYPAR_API kahypar_hyperedge_weight_t kahypar_soed_objective(const kahypar_hype
 KAHYPAR_API kahypar_hyperedge_weight_t kahypar_km1_objective(const kahypar_hypergraph_t* kahypar_hypergraph)  {
   const kahypar::Hypergraph& hypergraph = *reinterpret_cast<const kahypar::Hypergraph*>(kahypar_hypergraph);
   return kahypar::metrics::km1(hypergraph);
+}
+
+KAHYPAR_API kahypar_hyperedge_weight_t kahypar_tob_objective(const kahypar_hypergraph_t* kahypar_hypergraph)  {
+  const kahypar::Hypergraph& hypergraph = *reinterpret_cast<const kahypar::Hypergraph*>(kahypar_hypergraph);
+  return kahypar::metrics::topologyDifference(hypergraph);
 }
 
 KAHYPAR_API double kahypar_absorption_objective(const kahypar_hypergraph_t* kahypar_hypergraph)  {

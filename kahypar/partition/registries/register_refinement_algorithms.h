@@ -36,6 +36,7 @@
 #include "kahypar/partition/refinement/kway_fm_flow_refiner.h"
 #include "kahypar/partition/refinement/kway_fm_km1_refiner.h"
 #include "kahypar/partition/refinement/policies/fm_stop_policy.h"
+#include "kahypar/partition/refinement/tob_refiner.h"
 
 #define REGISTER_DISPATCHED_REFINER(id, dispatcher, ...)          \
   static meta::Registrar<RefinerFactory> register_ ## dispatcher( \
@@ -84,4 +85,5 @@ REGISTER_REFINER(RefinementAlgorithm::kway_fm_hyperflow_cutter_km1, KWayFMFlowRe
 REREGISTER_REFINER(RefinementAlgorithm::kway_fm_hyperflow_cutter, KWayFMFlowRefiner, 2);
 
 REGISTER_REFINER(RefinementAlgorithm::do_nothing, DoNothingRefiner);
+REGISTER_REFINER(RefinementAlgorithm::tob_refine, TOBRefiner);
 }  // namespace kahypar

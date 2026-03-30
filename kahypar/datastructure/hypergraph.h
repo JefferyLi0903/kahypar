@@ -42,6 +42,7 @@
 #include "kahypar-resources/meta/int_to_type.h"
 #include "kahypar-resources/meta/mandatory.h"
 #include "kahypar/partition/context_enum_classes.h"
+#include "kahypar/partition/tob_utils.h"
 #include "kahypar/utils/math.h"
 
 
@@ -517,6 +518,18 @@ class GenericHypergraph {
     HypernodeID size;
   };
 
+  /*!
+   * For TOB (Topological Order Balancing), stores min/max topological levels per partition
+   * to enable O(1) gain computation during refinement.
+   */
+  class PartLevelInfo {
+ public:
+    int32_t min_level = std::numeric_limits<int32_t>::max();
+    int32_t max_level = std::numeric_limits<int32_t>::min();
+    HypernodeID min_count = 0;  // Number of nodes at min_level
+    HypernodeID max_count = 0;  // Number of nodes at max_level
+  };
+
   // ! The data type used to store indices into HyperedgeVector
   using HyperedgeIndexVector = std::vector<size_t>;
   // ! The data type used to store the pins of all nets
@@ -977,6 +990,8 @@ class GenericHypergraph {
     DBG << "contracting (" << u << "," << v << ")";
 
     hypernode(u).setWeight(hypernode(u).weight() + hypernode(v).weight());
+    // Note: Topological levels are preserved in _topological_levels vector
+    // even when nodes are disabled, so v's level is preserved for restoration
     if (isFixedVertex(u)) {
       if (!isFixedVertex(v)) {
         _part_info[fixedVertexPartID(u)].fixed_vertex_weight += hypernode(v).weight();
@@ -1467,6 +1482,15 @@ class GenericHypergraph {
       hyperedge(i).connectivity = 0;
       _connectivity_sets[i].clear();
     }
+    // Reset level info
+    if (hasTopologicalLevels() && !_part_level_info.empty()) {
+      for (PartitionID i = 0; i < _k; ++i) {
+        _part_level_info[i].min_level = std::numeric_limits<int32_t>::max();
+        _part_level_info[i].max_level = std::numeric_limits<int32_t>::min();
+        _part_level_info[i].min_count = 0;
+        _part_level_info[i].max_count = 0;
+      }
+    }
     // Recalculate fixed vertex part weights
     HyperedgeWeight fixed_vertex_weight = 0;
     for (const HypernodeID& hn : fixedVertices()) {
@@ -1480,6 +1504,10 @@ class GenericHypergraph {
     ASSERT(partition.size() == _num_hypernodes);
     for (HypernodeID u : nodes()) {
       setNodePart(u, partition[u]);
+    }
+    // Initialize level info after setting partition
+    if (hasTopologicalLevels()) {
+      initializePartLevelInfo();
     }
   }
 
@@ -1524,6 +1552,15 @@ class GenericHypergraph {
     _pins_in_part.resize(static_cast<size_t>(_num_hyperedges) * k, 0);
     _part_info.resize(k, PartInfo());
     _connectivity_sets.resize(_num_hyperedges);
+    if (hasTopologicalLevels()) {
+      _part_level_info.resize(k);
+      for (PartitionID i = 0; i < k; ++i) {
+        _part_level_info[i].min_level = std::numeric_limits<int32_t>::max();
+        _part_level_info[i].max_level = std::numeric_limits<int32_t>::min();
+        _part_level_info[i].min_count = 0;
+        _part_level_info[i].max_count = 0;
+      }
+    }
   }
 
   void setType(const Type type) {
@@ -1584,6 +1621,102 @@ class GenericHypergraph {
   bool isFixedVertex(const HypernodeID hn) const {
     ASSERT(!hypernode(hn).isDisabled(), "Hypernode" << hn << "is disabled");
     return fixedVertexPartID(hn) != kInvalidPartition;
+  }
+
+  // ! Returns true if topological levels are available
+  bool hasTopologicalLevels() const {
+    return !_topological_levels.empty();
+  }
+
+  // ! Gets the topological level of a hypernode
+  int32_t topologicalLevel(const HypernodeID hn) const {
+    ASSERT(!hypernode(hn).isDisabled(), "Hypernode" << hn << "is disabled");
+    ASSERT(hasTopologicalLevels(), "Topological levels not available");
+    ASSERT(hn < static_cast<HypernodeID>(_topological_levels.size()),
+           "Hypernode" << hn << "out of bounds for topological levels");
+    return _topological_levels[hn];
+  }
+
+  // ! Sets the topological level of a hypernode
+  void setTopologicalLevel(const HypernodeID hn, const int32_t level) {
+    ASSERT(!hypernode(hn).isDisabled(), "Hypernode" << hn << "is disabled");
+    if (_topological_levels.empty()) {
+      _topological_levels.resize(_num_hypernodes, -1);
+    }
+    ASSERT(hn < static_cast<HypernodeID>(_topological_levels.size()),
+           "Hypernode" << hn << "out of bounds for topological levels");
+    _topological_levels[hn] = level;
+  }
+
+  // ! Sets topological levels for all hypernodes
+  void setTopologicalLevels(const std::vector<int32_t>& levels) {
+    ASSERT(levels.size() == static_cast<size_t>(_num_hypernodes),
+           "Topological levels size mismatch");
+    _topological_levels = levels;
+    initializePartLevelInfo();
+  }
+
+  HyperedgeWeight partTopologicalRange(const PartitionID part,
+                                       const HypernodeID ignored_hn = std::numeric_limits<HypernodeID>::max()) const {
+    ASSERT(part < _k && part != kInvalidPartition, "Invalid part ID");
+    int32_t min_level = std::numeric_limits<int32_t>::max();
+    int32_t max_level = std::numeric_limits<int32_t>::min();
+    bool has_nodes = false;
+    for (const HypernodeID& hn : nodes()) {
+      if (hn == ignored_hn) {
+        continue;
+      }
+      if (partID(hn) == part) {
+        const int32_t level = topologicalLevel(hn);
+        min_level = std::min(min_level, level);
+        max_level = std::max(max_level, level);
+        has_nodes = true;
+      }
+    }
+    return has_nodes ? static_cast<HyperedgeWeight>(max_level - min_level) : 0;
+  }
+
+  // ! Initialize per-partition level statistics for O(1) TOB gain computation
+  void initializePartLevelInfo() {
+    if (!hasTopologicalLevels()) {
+      return;
+    }
+    _part_level_info.clear();
+    _part_level_info.resize(_k);
+    for (PartitionID part = 0; part < _k; ++part) {
+      recomputePartLevelInfo(part);
+    }
+  }
+
+  // ! Get per-partition level info (for O(1) TOB gain computation)
+  const PartLevelInfo& partLevelInfo(const PartitionID part) const {
+    ASSERT(part < _k && part != kInvalidPartition, "Invalid part ID");
+    return _part_level_info[part];
+  }
+
+  // ! Compute TOB gain for moving node from from_part to to_part.
+  // ! This version favors correctness over asymptotic speed and recomputes
+  // ! the full TOB objective exactly for the hypothetical move.
+  // ! Returns the change in TOB metric: positive means improvement (decrease in TOB)
+  HyperedgeWeight computeTOBGain(const HypernodeID hn, const PartitionID from_part,
+                                 const PartitionID to_part) const {
+    if (!hasTopologicalLevels() || from_part == to_part || _part_level_info.empty()) {
+      return 0;
+    }
+    const int32_t tau = topologicalLevel(hn);
+    TOBMetricState<GenericHypergraph> state(*this);
+    return state.scaledMoveGain(tau, from_part, to_part);
+  }
+
+  // ! Update per-partition level info when node moves.
+  void updatePartLevelInfo(const HypernodeID hn, const PartitionID from_part,
+                           const PartitionID to_part) {
+    if (!hasTopologicalLevels() || from_part == to_part) {
+      return;
+    }
+    static_cast<void>(hn);
+    recomputePartLevelInfo(from_part);
+    recomputePartLevelInfo(to_part);
   }
 
   // ! Returns true if the hypernode is enabled
@@ -1870,6 +2003,35 @@ class GenericHypergraph {
     return hyperedge(he);
   }
 
+  void recomputePartLevelInfo(const PartitionID part) {
+    ASSERT(part < _k && part != kInvalidPartition, "Invalid part ID");
+    if (_part_level_info.empty()) {
+      return;
+    }
+    PartLevelInfo& info = _part_level_info[part];
+    info.min_level = std::numeric_limits<int32_t>::max();
+    info.max_level = std::numeric_limits<int32_t>::min();
+    info.min_count = 0;
+    info.max_count = 0;
+    for (const HypernodeID& hn : nodes()) {
+      if (partID(hn) == part) {
+        const int32_t level = topologicalLevel(hn);
+        if (level < info.min_level) {
+          info.min_level = level;
+          info.min_count = 1;
+        } else if (level == info.min_level) {
+          ++info.min_count;
+        }
+        if (level > info.max_level) {
+          info.max_level = level;
+          info.max_count = 1;
+        } else if (level == info.max_level) {
+          ++info.max_count;
+        }
+      }
+    }
+  }
+
  private:
   FRIEND_TEST(AHypergraph, DisconnectsHypernodeFromHyperedge);
   FRIEND_TEST(AHypergraph, RemovesHyperedges);
@@ -1928,6 +2090,31 @@ class GenericHypergraph {
     hypernode(u).part_id = id;
     _part_info[id].weight += nodeWeight(u);
     ++_part_info[id].size;
+    // Update level info for TOB (O(1))
+    if (hasTopologicalLevels() && !_part_level_info.empty()) {
+      const int32_t level = topologicalLevel(u);
+      PartLevelInfo& info = _part_level_info[id];
+      if (info.min_level == std::numeric_limits<int32_t>::max()) {
+        // Empty partition
+        info.min_level = level;
+        info.max_level = level;
+        info.min_count = 1;
+        info.max_count = 1;
+      } else {
+        if (level < info.min_level) {
+          info.min_level = level;
+          info.min_count = 1;
+        } else if (level == info.min_level) {
+          ++info.min_count;
+        }
+        if (level > info.max_level) {
+          info.max_level = level;
+          info.max_count = 1;
+        } else if (level == info.max_level) {
+          ++info.max_count;
+        }
+      }
+    }
   }
 
   // ! Moves an assigned hypernode to a different block
@@ -1941,6 +2128,10 @@ class GenericHypergraph {
     --_part_info[from].size;
     _part_info[to].weight += nodeWeight(u);
     ++_part_info[to].size;
+    // Update level info for TOB (O(1) in most cases)
+    if (hasTopologicalLevels() && !_part_level_info.empty()) {
+      updatePartLevelInfo(u, from, to);
+    }
   }
 
   // ! Decrements the number of pins of a hyperedge in a block by one.
@@ -2199,12 +2390,18 @@ class GenericHypergraph {
   // ! Stores fixed vertex part ids
   std::vector<PartitionID> _fixed_vertex_part_id;
 
+  // ! Stores topological level for each hypernode (for DAGs)
+  // ! Empty if topological levels are not available
+  std::vector<int32_t> _topological_levels;
+
   // ! Weight and size information for all blocks.
   std::vector<PartInfo> _part_info;
   // ! For each hyperedge and each block, _pins_in_part stores the number of pins in that block
   std::vector<HypernodeID> _pins_in_part;
   // ! For each hyperedge, _connectivity_sets stores the blocks the hyperedge connects
   ConnectivitySets<PartitionID, HyperedgeID> _connectivity_sets;
+  // ! For TOB: per-partition level statistics for O(1) gain computation
+  std::vector<PartLevelInfo> _part_level_info;
 
   /*!
    * Used during uncontraction to decide how to perform the uncontraction operation.
@@ -2418,6 +2615,14 @@ reindex(const Hypergraph& hypergraph) {
     }
   }
 
+  if (hypergraph.hasTopologicalLevels()) {
+    std::vector<int32_t> levels(num_hypernodes, 0);
+    for (const HypernodeID& hn : reindexed_hypergraph->nodes()) {
+      levels[hn] = hypergraph.topologicalLevel(reindexed_to_original[hn]);
+    }
+    reindexed_hypergraph->setTopologicalLevels(levels);
+  }
+
   reindexed_hypergraph->_part_info.resize(reindexed_hypergraph->_k);
   for (const HypernodeID& hn : reindexed_hypergraph->nodes()) {
     HypernodeID original_hn = reindexed_to_original[hn];
@@ -2579,6 +2784,14 @@ static void setupInternalStructure(const Hypergraph& reference,
     for (const HypernodeID& pin : subhypergraph.pins(he)) {
       subhypergraph.hypernode(pin).incidentNets().push_back(he);
     }
+  }
+
+  if (reference.hasTopologicalLevels()) {
+    std::vector<int32_t> levels(num_hypernodes, 0);
+    for (const HypernodeID& hn : subhypergraph.nodes()) {
+      levels[hn] = reference.topologicalLevel(mapping[hn]);
+    }
+    subhypergraph.setTopologicalLevels(levels);
   }
 
   // sentinel for peeks during uncontraction

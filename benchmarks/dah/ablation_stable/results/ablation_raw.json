@@ -1,0 +1,50 @@
+[
+  {
+    "graph": "stable_500.dah",
+    "objective": "cut",
+    "cut": 360,
+    "tob_scaled": 2521484706,
+    "imbalance": 0.026666666666666616,
+    "runtime_sec": 12.12665605545044
+  },
+  {
+    "graph": "stable_500.dah",
+    "objective": "tob",
+    "cut": 1324,
+    "tob_scaled": 4482241,
+    "imbalance": 0.0,
+    "runtime_sec": 3.893496036529541
+  },
+  {
+    "graph": "stable_501.dah",
+    "objective": "cut",
+    "cut": 370,
+    "tob_scaled": 2524666407,
+    "imbalance": 0.01333333333333342,
+    "runtime_sec": 11.718462944030762
+  },
+  {
+    "graph": "stable_501.dah",
+    "objective": "tob",
+    "cut": 1320,
+    "tob_scaled": 4399616,
+    "imbalance": 0.026666666666666616,
+    "runtime_sec": 3.6342148780822754
+  },
+  {
+    "graph": "stable_502.dah",
+    "objective": "cut",
+    "cut": 367,
+    "tob_scaled": 2561765361,
+    "imbalance": 0.006666666666666599,
+    "runtime_sec": 11.871846914291382
+  },
+  {
+    "graph": "stable_502.dah",
+    "objective": "tob",
+    "cut": 1301,
+    "tob_scaled": 4414039,
+    "imbalance": 0.026666666666666616,
+    "runtime_sec": 3.497091054916382
+  }
+]

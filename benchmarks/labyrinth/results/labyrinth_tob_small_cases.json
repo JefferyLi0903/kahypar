@@ -1,0 +1,14 @@
+[
+  {
+    "graph": "ibm01.dah",
+    "nodes": 4061,
+    "edges": 9128,
+    "status": "ok",
+    "runtime_sec": 35.58,
+    "error": "",
+    "part_file": "/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/labyrinth/dah/ibm01.dah.part8.epsilon0.03.seed1.KaHyPar",
+    "tob_scaled": 5118507002,
+    "cut": 5439,
+    "imbalance": 0.029527559055118058
+  }
+]

@@ -78,6 +78,12 @@ KAHYPAR_API void kahypar_set_fixed_vertices(kahypar_hypergraph_t* hypergraph,
 KAHYPAR_API kahypar_hypergraph_t* kahypar_create_hypergraph_from_file(const char* file_name,
                                                                       const kahypar_partition_id_t num_blocks);
 
+KAHYPAR_API kahypar_hypergraph_t* kahypar_create_hypergraph_from_dah_file(const char* file_name,
+                                                                          const kahypar_partition_id_t num_blocks);
+
+KAHYPAR_API void kahypar_set_topological_levels_from_file(kahypar_hypergraph_t* hypergraph,
+                                                          const char* file_name);
+
 KAHYPAR_API kahypar_hypergraph_t* kahypar_create_hypergraph(const kahypar_partition_id_t num_blocks,
                                                             const kahypar_hypernode_id_t num_vertices,
                                                             const kahypar_hyperedge_id_t num_hyperedges,
@@ -153,6 +159,8 @@ KAHYPAR_API kahypar_hyperedge_weight_t kahypar_cut_objective(const kahypar_hyper
 KAHYPAR_API kahypar_hyperedge_weight_t kahypar_soed_objective(const kahypar_hypergraph_t* kahypar_hypergraph);
 
 KAHYPAR_API kahypar_hyperedge_weight_t kahypar_km1_objective(const kahypar_hypergraph_t* kahypar_hypergraph);
+
+KAHYPAR_API kahypar_hyperedge_weight_t kahypar_tob_objective(const kahypar_hypergraph_t* kahypar_hypergraph);
 
 KAHYPAR_API double kahypar_absorption_objective(const kahypar_hypergraph_t* kahypar_hypergraph);
 

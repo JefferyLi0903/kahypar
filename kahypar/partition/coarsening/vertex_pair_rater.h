@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <limits>
 #include <stack>
+#include <unordered_map>
 #include <vector>
 
 #include "kahypar-resources/datastructure/fast_reset_flag_array.h"
@@ -95,6 +96,12 @@ class VertexPairRater {
   VertexPairRating rate(const HypernodeID u) {
     DBG << "Calculating rating for HN" << u;
     const HypernodeWeight weight_u = _hg.nodeWeight(u);
+    std::unordered_map<int32_t, int> level_histogram;
+    if (_context.partition.objective == Objective::tob && _hg.hasTopologicalLevels()) {
+      for (const HypernodeID& hn : _hg.nodes()) {
+        ++level_histogram[_hg.topologicalLevel(hn)];
+      }
+    }
     for (const HyperedgeID& he : _hg.incidentEdges(u)) {
       ASSERT(_hg.edgeSize(he) > 1, V(he));
       if (_hg.edgeSize(he) <= _context.partition.hyperedge_size_threshold) {
@@ -116,7 +123,11 @@ class VertexPairRater {
       HypernodeWeight penalty = HeavyNodePenaltyPolicy::penalty(weight_u,
                                                                 target_weight);
       penalty = penalty == 0 ? std::max(std::max(weight_u, target_weight), 1) : penalty;
-      const RatingType tmp_rating = it->value / static_cast<double>(penalty);
+      RatingType tmp_rating = it->value / static_cast<double>(penalty);
+      if (_context.partition.objective == Objective::tob && _hg.hasTopologicalLevels()) {
+        tmp_rating += static_cast<RatingType>(
+          _context.partition.tob_gamma * topologicalCoarseningGain(u, tmp_target, level_histogram));
+      }
       DBG << "r(" << u << "," << tmp_target << ")=" << tmp_rating;
       if (CommunityPolicy::sameCommunity(_hg.communities(), u, tmp_target) &&
           AcceptancePolicy::acceptRating(tmp_rating, max_rating,
@@ -157,6 +168,25 @@ class VertexPairRater {
   bool belowThresholdNodeWeight(const HypernodeWeight weight_u,
                                 const HypernodeWeight weight_v) const {
     return weight_v + weight_u <= _context.coarsening.max_allowed_node_weight;
+  }
+
+  double topologicalCoarseningGain(const HypernodeID u,
+                                   const HypernodeID v,
+                                   const std::unordered_map<int32_t, int>& level_histogram) const {
+    const int32_t tau_u = _hg.topologicalLevel(u);
+    const int32_t tau_v = _hg.topologicalLevel(v);
+    const double bound = std::max(1.0, 160.0 * static_cast<double>(_context.partition.k));
+
+    auto ave = [&](const int32_t tau) {
+      const auto it = level_histogram.find(tau);
+      const double count = (it == level_histogram.end()) ? 0.0 : static_cast<double>(it->second);
+      return count / bound;
+    };
+
+    if (tau_u == tau_v) {
+      return ave(tau_u) - 2.0;
+    }
+    return (ave(tau_u) - 1.0) + (ave(tau_v) - 1.0);
   }
 
   Hypergraph& _hg;

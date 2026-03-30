@@ -72,6 +72,12 @@ add_executable(MtxToWeightedHgr mtx_to_weighted_hgr_converter.cc mtx_to_hgr_conv
 set_property(TARGET MtxToWeightedHgr PROPERTY CXX_STANDARD 14)
 set_property(TARGET MtxToWeightedHgr PROPERTY CXX_STANDARD_REQUIRED ON)
 
+# TOB vs Cut comparison test
+add_executable(TobComparisonTest tob_comparison_test.cc)
+target_link_libraries(TobComparisonTest ${Boost_LIBRARIES})
+set_property(TARGET TobComparisonTest PROPERTY CXX_STANDARD 17)
+set_property(TARGET TobComparisonTest PROPERTY CXX_STANDARD_REQUIRED ON)
+
 if(BUILD_TESTING)
   # This test needs test instance files, so we copy them to the corresponding build dir
   file(COPY test_instances DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

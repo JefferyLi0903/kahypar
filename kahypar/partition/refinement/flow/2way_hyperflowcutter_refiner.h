@@ -184,9 +184,20 @@ class TwoWayHyperFlowCutterRefiner final : public IRefiner,
         }
         
         ASSERT(STF.cutAtStake >= newCut);
-        best_metrics.km1 -= (STF.cutAtStake - newCut);
+        const HyperedgeWeight improvement = STF.cutAtStake - newCut;
+        if (_context.partition.objective == Objective::cut) {
+          best_metrics.cut -= improvement;
+        } else {
+          best_metrics.km1 -= improvement;
+        }
         best_metrics.imbalance = metrics::imbalance(_hg, _context);
-        HEAVY_REFINEMENT_ASSERT(best_metrics.km1 == metrics::km1(_hg), V(best_metrics.km1) << V(metrics::km1(_hg)));
+        if (_context.partition.objective == Objective::cut) {
+          HEAVY_REFINEMENT_ASSERT(best_metrics.cut == metrics::hyperedgeCut(_hg),
+                                  V(best_metrics.cut) << V(metrics::hyperedgeCut(_hg)));
+        } else {
+          HEAVY_REFINEMENT_ASSERT(best_metrics.km1 == metrics::km1(_hg),
+                                  V(best_metrics.km1) << V(metrics::km1(_hg)));
+        }
 
         DBG << "Update partition" << V(metrics::imbalance(_hg, _context)) << V(b0) << V(b1) << V(_hg.currentNumNodes());
         if (_hg.partWeight(b0) > max_weight_b0 || _hg.partWeight(b1) > max_weight_b1) {

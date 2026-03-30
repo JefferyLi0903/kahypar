@@ -31,6 +31,23 @@ Table of Contents
    * [Contributing](#contributing)
 
 
+Experimental DAH / TOB Support
+-----------
+
+This branch includes experimental support for Directed Acyclic Hypergraph (`.dah`)
+inputs and a `tob` objective that minimizes topological spread inside blocks while
+still respecting the usual balance constraint. You can either:
+
+- pass a `.dah` file directly, or
+- pass a regular `.hgr` together with `--topology-file <levels.lvl>`
+
+The `tob` objective is intentionally softer than a strict topological-order
+partitioning constraint: it tries to keep each block topologically compact while
+still optimizing for balanced block weights. Small sample instances are available
+under [`benchmarks/dah`](/Users/limuhan/myProjects/GitHub/kahypar/benchmarks/dah), and a staging
+script for public benchmark sources is provided in
+[`scripts/download_open_dah_benchmarks.sh`](/Users/limuhan/myProjects/GitHub/kahypar/scripts/download_open_dah_benchmarks.sh).
+
 
 What is a Hypergraph? What is Hypergraph Partitioning?
 -----------

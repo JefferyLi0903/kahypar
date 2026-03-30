@@ -21,17 +21,20 @@
 #pragma once
 
 #include <cmath>
+#include <limits>
 
 #include <algorithm>
 #include <vector>
 
 #include "kahypar/definitions.h"
 #include "kahypar/partition/context.h"
+#include "kahypar/partition/tob_utils.h"
 
 namespace kahypar {
 struct Metrics {
   HyperedgeWeight cut;
   HyperedgeWeight km1;
+  HyperedgeWeight tob;
   double imbalance;
 
   void updateMetric(const HyperedgeWeight value, const Mode mode, const Objective objective) {
@@ -42,6 +45,9 @@ struct Metrics {
           break;
         case Objective::km1:
           km1 = value;
+          break;
+        case Objective::tob:
+          tob = value;
           break;
         default:
           LOG << "Unknown Objective";
@@ -58,6 +64,7 @@ struct Metrics {
       switch (objective) {
         case Objective::cut: return cut;
         case Objective::km1: return km1;
+        case Objective::tob: return tob;
         default:
           LOG << "Unknown Objective";
           exit(-1);
@@ -115,10 +122,66 @@ static inline double absorption(const Hypergraph& hg) {
   return absorption_val;
 }
 
+static inline HyperedgeWeight topologyDifference(const Hypergraph& hg) {
+  if (!hg.hasTopologicalLevels()) {
+    return 0;
+  }
+  TOBMetricState<Hypergraph> state(hg);
+  return state.scaledMetric();
+}
+
+static inline HyperedgeWeight tieBreakerMetric(const Hypergraph& hg, const Objective& objective) {
+  switch (objective) {
+    case Objective::cut:
+      return hyperedgeCut(hg);
+    case Objective::km1:
+      return km1(hg);
+    case Objective::tob:
+      return hyperedgeCut(hg);
+    default:
+      LOG << "Unknown Objective";
+      exit(-1);
+  }
+}
+
+static inline bool isBetterPartition(const HyperedgeWeight current_primary,
+                                     const HyperedgeWeight best_primary,
+                                     const HyperedgeWeight current_tiebreak,
+                                     const HyperedgeWeight best_tiebreak,
+                                     const double current_imbalance,
+                                     const double best_imbalance,
+                                     const double epsilon) {
+  const bool current_feasible = current_imbalance <= epsilon;
+  const bool best_feasible = best_imbalance <= epsilon;
+  if (current_feasible != best_feasible) {
+    return current_feasible;
+  }
+  if (current_feasible) {
+    if (current_primary != best_primary) {
+      return current_primary < best_primary;
+    }
+    if (current_tiebreak != best_tiebreak) {
+      return current_tiebreak < best_tiebreak;
+    }
+    return current_imbalance < best_imbalance;
+  }
+  if (current_imbalance != best_imbalance) {
+    return current_imbalance < best_imbalance;
+  }
+  if (current_primary != best_primary) {
+    return current_primary < best_primary;
+  }
+  if (current_tiebreak != best_tiebreak) {
+    return current_tiebreak < best_tiebreak;
+  }
+  return false;
+}
+
 static inline HyperedgeWeight objective(const Hypergraph& hg, const Objective& objective) {
   switch (objective) {
     case Objective::cut: return hyperedgeCut(hg);
     case Objective::km1: return km1(hg);
+    case Objective::tob: return topologyDifference(hg);
     default:
       LOG << "Unknown Objective";
       exit(-1);
@@ -249,6 +312,8 @@ static inline HyperedgeWeight correctMetric(const Hypergraph& hypergraph, const 
       return km1(hypergraph);
     case Objective::cut:
       return hyperedgeCut(hypergraph);
+    case Objective::tob:
+      return topologyDifference(hypergraph);
     default:
       LOG << "The specified Objective is not listed in the Metrics";
       std::exit(0);
